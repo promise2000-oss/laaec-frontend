@@ -1,0 +1,29 @@
+{
+  "name": "laec-cbt-portal",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "amazon-cognito-identity-js": "6.3.7",
+    "aws-sdk": "2.1555.0",
+    "chart.js": "4.5.1",
+    "jspdf": "2.5.1",
+    "pinia": "4.0.3",
+    "vue": "3.5.43",
+    "vue-router": "4.6.4",
+    "xlsx": "0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.9",
+    "pdf-parse": "2.4.5",
+    "typescript": "5.9.3",
+    "vite": "8.3.1",
+    "vue-tsc": "3.3.11"
+  }
+}

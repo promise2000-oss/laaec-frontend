@@ -1,0 +1,3027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAEC | School Admin Portal</title>
+    <link rel="icon" href="/laec%20logo.png" type="image/png">
+    
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1555.0.min.js"></script>
+    <script src="/config.js"></script>
+    <script src="/dashboard-overview.js"></script>
+    <script src="/exam-session-controls.js"></script>
+    <script src="/question-management.js"></script>
+    <script src="/admin-sidebar.js" defer></script>
+    <script src="/dashboard-registration.js?v=20260608-photo-upload"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/exam-session-controls.css">
+    <link rel="stylesheet" href="/dashboard-registration.css?v=20260608-photo-upload">
+
+    <style>
+        :root {
+            --laec-blue: #123a63;
+            --laec-blue-deep: #0b2242;
+            --laec-accent: #4ec6ff;
+            --bg-light: #f2f6fb;
+            --bg-soft: #e8f0f8;
+            --white: #ffffff;
+            --text-dark: #15243d;
+            --text-soft: #5f7087;
+            --success: #11895f;
+            --danger: #c44444;
+            --border: #d8e3f0;
+            --warning: #f1b844;
+            --shadow: 0 18px 45px rgba(12, 38, 69, 0.12);
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            min-height: 100%;
+            margin: 0;
+        }
+
+        body {
+            font-family: "Manrope", "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(78, 198, 255, 0.18), transparent 28%),
+                radial-gradient(circle at right 12%, rgba(17, 137, 95, 0.12), transparent 24%),
+                linear-gradient(180deg, #eef5fb 0%, #f9fbfd 52%, #eef4fa 100%);
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding-top: var(--header-offset, 220px);
+            position: relative;
+        }
+
+        .bubble-field {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .bubble {
+            position: absolute;
+            bottom: -18vh;
+            width: var(--size);
+            height: var(--size);
+            left: var(--left);
+            border-radius: 50% 50% 48% 52%;
+            background:
+                radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.92) 0 8%, transparent 9%),
+                radial-gradient(circle at 70% 78%, rgba(0, 194, 255, 0.2), transparent 35%),
+                rgba(255, 255, 255, 0.28);
+            border: 1px solid rgba(0, 74, 153, 0.14);
+            box-shadow:
+                inset 0 0 18px rgba(255, 255, 255, 0.4),
+                inset -10px -14px 28px rgba(0, 194, 255, 0.12),
+                0 10px 34px rgba(11, 34, 66, 0.08);
+            opacity: 0;
+            transform: translate3d(0, 0, 0) scale(0.86);
+            animation: bubbleFloat var(--duration) linear infinite;
+            animation-delay: var(--delay);
+        }
+
+        .bubble::after {
+            content: "";
+            position: absolute;
+            inset: 14% 18% auto auto;
+            width: 22%;
+            height: 22%;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.42);
+            filter: blur(1px);
+        }
+
+        @keyframes bubbleFloat {
+            0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.82); }
+            12% { opacity: 0.62; }
+            50% { transform: translate3d(var(--drift), -56vh, 0) scale(1); }
+            88% { opacity: 0.48; }
+            100% { opacity: 0; transform: translate3d(calc(var(--drift) * -0.45), -118vh, 0) scale(1.12); }
+        }
+
+        header {
+            width: 100%;
+            margin: 0;
+            padding: 1rem 1.4rem 1.2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+            justify-content: space-between;
+            align-items: stretch;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            color: white;
+            background: linear-gradient(135deg, rgba(11, 34, 66, 0.96), rgba(18, 58, 99, 0.9));
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 0;
+            box-shadow: 0 18px 38px rgba(11, 34, 66, 0.24);
+            backdrop-filter: blur(18px);
+        }
+
+        .header-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-family: "Space Grotesk", "Manrope", sans-serif;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        .brand img {
+            height: 46px;
+            object-fit: contain;
+            filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.18));
+        }
+
+        .menu-toggle {
+            display: none;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 0.72rem;
+            letter-spacing: 0.16em;
+            cursor: pointer;
+            padding: 10px 12px;
+            border-radius: 999px;
+        }
+
+        .nav-container {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            position: static;
+            z-index: auto;
+            display: flex;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            backdrop-filter: none;
+        }
+
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            overflow-x: visible;
+            white-space: normal;
+            -webkit-overflow-scrolling: touch;
+            gap: 0.45rem;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .nav-tabs::-webkit-scrollbar { height: 6px; }
+        .nav-tabs::-webkit-scrollbar-thumb { background: rgba(18, 58, 99, 0.22); border-radius: 999px; }
+
+        .tab {
+            padding: 0.82rem 0.78rem;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.82);
+            border-radius: 8px;
+            min-width: 126px;
+            font-size: 0.64rem;
+            font-weight: 800;
+            color: var(--laec-blue-deep);
+            background: white;
+            transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            text-align: center;
+        }
+
+        .filter-action-cell {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .filter-action-buttons {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .filter-action-buttons button {
+            flex: 1;
+            margin-top: 0;
+            min-width: 118px;
+            padding: 10px 12px;
+            font-size: 0.68rem;
+        }
+
+        .tab:hover {
+            color: var(--laec-blue);
+            background: rgba(255, 255, 255, 0.94);
+            border-color: rgba(78, 198, 255, 0.9);
+            transform: translateY(-1px);
+        }
+
+        .tab.active {
+            color: white;
+            background: linear-gradient(135deg, rgba(78, 198, 255, 0.38), rgba(18, 58, 99, 0.78));
+            border-color: rgba(255, 255, 255, 0.42);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 10px 20px rgba(11, 34, 66, 0.2);
+            backdrop-filter: blur(14px);
+        }
+
+        .logout-btn-header {
+            background: white;
+            color: var(--laec-blue-deep);
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            padding: 10px 16px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.76rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .logout-btn-header:hover {
+            background: rgba(255, 255, 255, 0.92);
+            color: var(--laec-blue);
+        }
+
+        .logout-btn-drawer {
+            margin: 0;
+            padding: 12px;
+            background: white;
+            color: var(--laec-blue-deep);
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            border-radius: 8px;
+            font-weight: 800;
+            cursor: pointer;
+            text-align: center;
+            display: none;
+        }
+
+        .back-to-top {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            width: 52px;
+            height: 52px;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, var(--laec-blue), var(--laec-blue-deep));
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 16px 32px rgba(11, 34, 66, 0.26);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(12px);
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+            z-index: 1200;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .main-content {
+            width: 100%;
+            max-width: 1800px;
+            padding: 1.3rem 1rem 1.8rem;
+            flex: none;
+            overflow: visible;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-content::-webkit-scrollbar { width: 10px; }
+        .main-content::-webkit-scrollbar-track { background: rgba(216, 227, 240, 0.55); border-radius: 999px; }
+        .main-content::-webkit-scrollbar-thumb { background: rgba(18, 58, 99, 0.34); border-radius: 999px; }
+
+        .tab-panel { display: none; animation: fadeIn 0.35s ease; }
+        .tab-panel.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .internal-scroll-viewport {
+            height: calc(100vh - 280px);
+            overflow-y: auto;
+            border: 1px solid rgba(216, 227, 240, 0.92);
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.88);
+            box-shadow: var(--shadow);
+        }
+
+        .internal-scroll-viewport::-webkit-scrollbar { width: 8px; }
+        .internal-scroll-viewport::-webkit-scrollbar-track { background: rgba(18, 58, 99, 0.04); border-radius: 10px; }
+        .internal-scroll-viewport::-webkit-scrollbar-thumb { background: rgba(18, 58, 99, 0.36); border-radius: 10px; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.2rem;
+            margin-bottom: 1.6rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(244, 249, 255, 0.95));
+            padding: 1.45rem;
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(216, 227, 240, 0.92);
+            text-align: left;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::after {
+            content: "";
+            position: absolute;
+            inset: auto 0 0 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--laec-blue), var(--laec-accent));
+        }
+
+        .stat-card h4 {
+            margin: 0;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            color: var(--text-soft);
+            letter-spacing: 0.14em;
+        }
+
+        .stat-card .value {
+            font-family: "Space Grotesk", "Manrope", sans-serif;
+            font-size: 2.1rem;
+            font-weight: 700;
+            margin: 0.6rem 0 0;
+            color: var(--laec-blue-deep);
+            line-height: 1.05;
+        }
+
+        .promotion-alert-card {
+            border-left: 5px solid var(--danger) !important;
+            background: #fff5f5 !important;
+            cursor: pointer;
+            min-height: 100%;
+        }
+
+        .promotion-alert-card .value {
+            color: var(--danger);
+            font-size: 1.12rem;
+            line-height: 1.2;
+            animation: promotionBlink 1s ease-in-out infinite;
+        }
+
+        @keyframes promotionBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
+        }
+
+        .control-box {
+            background:
+                radial-gradient(circle at top right, rgba(78, 198, 255, 0.34), transparent 25%),
+                linear-gradient(135deg, var(--laec-blue-deep), var(--laec-blue));
+            color: white;
+            padding: 2rem;
+            border-radius: 28px;
+            margin-bottom: 1.6rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.2rem;
+            box-shadow: 0 26px 54px rgba(11, 34, 66, 0.28);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-box::before {
+            content: "";
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            right: -90px;
+            top: -80px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .hero-copy, .hero-actions {
+            position: relative;
+            z-index: 1;
+        }
+
+        .section-kicker {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 0.55rem;
+            font-weight: 800;
+        }
+
+        .hero-copy h2, .control-box h2 {
+            margin: 0;
+            font-family: "Space Grotesk", "Manrope", sans-serif;
+            font-size: 2rem;
+            line-height: 1.05;
+        }
+
+        .hero-copy p, .control-box p {
+            margin: 0.6rem 0 0;
+            color: rgba(255, 255, 255, 0.78);
+            max-width: 620px;
+        }
+
+        .hero-badges {
+            display: flex;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.55rem 0.9rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .mode-toggle-group {
+            background: rgba(255, 255, 255, 0.12);
+            padding: 6px;
+            border-radius: 16px;
+            display: flex;
+            gap: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .mode-btn {
+            background: transparent;
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            font-size: 0.74rem;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .mode-btn.active-a { background: var(--success); box-shadow: 0 12px 20px rgba(17, 137, 95, 0.24); }
+        .mode-btn.active-b { background: var(--warning); color: #2f2400; box-shadow: 0 12px 20px rgba(241, 184, 68, 0.24); }
+        .mode-btn.active-off { background: var(--danger); box-shadow: 0 12px 20px rgba(196, 68, 68, 0.24); }
+        .mode-btn.active-on { background: var(--success); box-shadow: 0 12px 20px rgba(17, 137, 95, 0.24); }
+
+        .card {
+            background: rgba(255, 255, 255, 0.92);
+            padding: 1.8rem;
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 1.25rem;
+            width: 100%;
+            border: 1px solid rgba(216, 227, 240, 0.96);
+            backdrop-filter: blur(14px);
+        }
+
+        .card h3 {
+            margin: 0 0 0.35rem;
+            font-family: "Space Grotesk", "Manrope", sans-serif;
+            font-size: 1.2rem;
+            color: var(--laec-blue-deep);
+        }
+
+        .muted-copy {
+            color: var(--text-soft);
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+
+        .surface-note {
+            margin-top: 1rem;
+            padding: 1rem 1.1rem;
+            border-radius: 18px;
+            background: linear-gradient(135deg, rgba(78, 198, 255, 0.14), rgba(17, 137, 95, 0.08));
+            border: 1px solid rgba(78, 198, 255, 0.16);
+        }
+
+        .guide-list {
+            margin: 0.7rem 0 0;
+            padding-left: 1rem;
+            color: var(--text-soft);
+            line-height: 1.6;
+            font-size: 0.86rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.2rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.76rem;
+            font-weight: 800;
+            margin-bottom: 0.45rem;
+            color: var(--text-soft);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 13px 14px;
+            border: 1px solid rgba(18, 58, 99, 0.14);
+            border-radius: 14px;
+            background: rgba(248, 251, 255, 0.95);
+            color: var(--text-dark);
+            font-size: 0.95rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: rgba(18, 58, 99, 0.35);
+            box-shadow: 0 0 0 4px rgba(78, 198, 255, 0.14);
+            transform: translateY(-1px);
+        }
+
+        button {
+            padding: 12px 22px;
+            border-radius: 14px;
+            border: none;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            letter-spacing: 0.04em;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--laec-blue), var(--laec-blue-deep));
+            color: white;
+            box-shadow: 0 14px 24px rgba(18, 58, 99, 0.18);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #16a06f, var(--success));
+            color: white;
+            box-shadow: 0 14px 24px rgba(17, 137, 95, 0.2);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f7c948, #d99a00);
+            color: var(--laec-blue-deep);
+            box-shadow: 0 14px 24px rgba(217, 154, 0, 0.22);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #db6666, var(--danger));
+            color: white;
+            box-shadow: 0 14px 24px rgba(196, 68, 68, 0.18);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: none;
+        }
+
+        .table-responsive {
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 24px;
+            overflow-x: auto;
+            border: 1px solid rgba(216, 227, 240, 0.96);
+            box-shadow: var(--shadow);
+        }
+
+        .result-scroll-shell {
+            position: relative;
+        }
+
+        .result-scroll-shell .table-responsive {
+            scroll-behavior: smooth;
+        }
+
+        .result-scroll-btn {
+            position: fixed;
+            top: 50%;
+            z-index: 1200;
+            width: 20px;
+            height: 44px;
+            padding: 0;
+            border: none;
+            background: transparent;
+            color: var(--laec-blue-deep);
+            box-shadow: none;
+            transform: translateY(-50%);
+            font-size: 1.45rem;
+            font-weight: 900;
+            line-height: 1;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9);
+        }
+
+        .result-scroll-btn:hover {
+            transform: translateY(-50%) scale(1.12);
+        }
+
+        .result-scroll-left { left: 22px; }
+        .result-scroll-right { right: 22px; }
+
+        @media (min-width: 901px) {
+            body.laec-sidebar-ready .result-scroll-left {
+                left: calc(var(--laec-sidebar-width) + 12px);
+            }
+
+            body.laec-sidebar-ready .result-scroll-right {
+                right: 12px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .result-scroll-btn {
+                width: 18px;
+                height: 38px;
+                font-size: 1.25rem;
+            }
+
+            .result-scroll-left { left: 10px; }
+            .result-scroll-right { right: 10px; }
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            min-width: 800px;
+        }
+
+        #resultsTable {
+            min-width: 1120px;
+        }
+
+        th {
+            background: rgba(18, 58, 99, 0.04);
+            padding: 1rem;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            color: var(--text-soft);
+            border-bottom: 1px solid rgba(216, 227, 240, 0.9);
+            letter-spacing: 0.12em;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(216, 227, 240, 0.72);
+            font-size: 0.92rem;
+            color: var(--text-dark);
+            vertical-align: top;
+        }
+
+        tbody tr:nth-child(even) {
+            background: rgba(248, 251, 255, 0.82);
+        }
+
+        .photo-circle {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(18, 58, 99, 0.08);
+        }
+
+        #custom-alert {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(7, 17, 31, 0.6);
+            z-index: 5000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .alert-content {
+            background: white;
+            padding: 2.2rem;
+            border-radius: 26px;
+            text-align: center;
+            max-width: 460px;
+            width: 90%;
+            box-shadow: 0 28px 60px rgba(7, 17, 31, 0.26);
+            animation: slideDown 0.25s ease;
+        }
+
+        .alert-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(247, 250, 253, 0.82);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            backdrop-filter: blur(6px);
+        }
+
+        .spinner {
+            border: 5px solid rgba(18, 58, 99, 0.08);
+            border-top: 5px solid var(--laec-blue);
+            border-radius: 50%;
+            width: 54px;
+            height: 54px;
+            animation: spin 1s linear infinite;
+        }
+
+        .hidden { display: none !important; }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 900px) {
+            header {
+                width: 100%;
+                margin: 0;
+                border-radius: 0;
+                padding: 0.95rem 1rem;
+            }
+
+            .menu-toggle { display: block; }
+
+            .header-top-row { align-items: flex-start; }
+            .header-actions { width: 100%; justify-content: flex-start; }
+            .nav-container {
+                display: none;
+                flex-direction: column;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                background: transparent;
+                max-height: calc(100vh - 150px);
+                overflow-y: auto;
+                padding-bottom: 0.5rem;
+            }
+
+            .nav-container.open { display: flex; }
+            .nav-tabs { flex-direction: column; width: 100%; overflow: visible; flex-wrap: nowrap; align-items: stretch; justify-content: flex-start; padding-top: 0.25rem; gap: 0.6rem; }
+            .tab { width: 100%; min-width: 0; padding: 0.9rem 1rem; border-radius: 16px; background: rgba(255, 255, 255, 0.14); color: white; border-color: rgba(255, 255, 255, 0.22); box-shadow: 0 10px 18px rgba(11, 34, 66, 0.14); text-align: left; }
+            .tab.active { background: linear-gradient(135deg, rgba(78, 198, 255, 0.42), rgba(18, 58, 99, 0.8)); color: white; border-color: rgba(255, 255, 255, 0.36); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 12px 22px rgba(11, 34, 66, 0.2); }
+            .tab:hover { background: rgba(255, 255, 255, 0.24); color: white; border-color: rgba(255, 255, 255, 0.4); }
+            .logout-btn-drawer { display: block; width: 100%; margin-top: 0.35rem; padding: 0.95rem 1rem; border-radius: 16px; text-align: left; box-shadow: 0 10px 18px rgba(11, 34, 66, 0.14); }
+            .logout-btn-header { display: none; }
+            .main-content { padding: 1rem 0.7rem 1.5rem; }
+            .control-box { padding: 1.5rem; border-radius: 22px; }
+            .hero-copy h2, .control-box h2 { font-size: 1.55rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .card { padding: 1.25rem; border-radius: 20px; }
+            table { min-width: 680px; }
+            .internal-scroll-viewport { height: calc(100vh - 240px); }
+            html, body { overflow-x: hidden; overflow-y: auto; height: auto; }
+            body { display: block; }
+            .main-content { max-width: 1800px; margin: 0 auto; overflow: visible; flex: none; min-height: auto; }
+            .system-footer { margin-top: 1rem !important; }
+            .back-to-top { right: 14px; bottom: 14px; width: 48px; height: 48px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .bubble {
+                animation: none;
+                opacity: 0.14;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="/admin-sidebar.css">
+</head>
+<body><a href="https://www.laaec.com/cdn-cgi/content?id=5xhW0NWS3ZHTGEp_l2CIr1QYhwjYEk_fHwlMe.3hakY-1790618134.7279806-1.2.1.1-GDawRyP42vWlQhybVo1c6Jlkn0KFFf5cgSLXJH_fncCd.4N62l4fIZv_AoesWAN1" aria-hidden="true" rel="nofollow noopener" style="display: none !important; visibility: hidden !important"></a>
+
+<div class="bubble-field" aria-hidden="true">
+    <span class="bubble" style="--size: 72px; --left: 6%; --duration: 19s; --delay: -4s; --drift: 34px;"></span>
+    <span class="bubble" style="--size: 46px; --left: 14%; --duration: 15s; --delay: -10s; --drift: -26px;"></span>
+    <span class="bubble" style="--size: 118px; --left: 24%; --duration: 24s; --delay: -7s; --drift: 52px;"></span>
+    <span class="bubble" style="--size: 58px; --left: 38%; --duration: 17s; --delay: -2s; --drift: -42px;"></span>
+    <span class="bubble" style="--size: 92px; --left: 52%; --duration: 22s; --delay: -13s; --drift: 30px;"></span>
+    <span class="bubble" style="--size: 40px; --left: 63%; --duration: 14s; --delay: -5s; --drift: -18px;"></span>
+    <span class="bubble" style="--size: 132px; --left: 72%; --duration: 27s; --delay: -15s; --drift: -58px;"></span>
+    <span class="bubble" style="--size: 64px; --left: 84%; --duration: 18s; --delay: -8s; --drift: 36px;"></span>
+    <span class="bubble" style="--size: 34px; --left: 93%; --duration: 13s; --delay: -1s; --drift: -24px;"></span>
+</div>
+
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <p id="loading-overlay-text" style="margin-top: 15px; font-weight: bold; color: var(--laec-blue);">LAEC School Portal Syncing...</p>
+</div>
+
+<div id="custom-alert">
+    <div class="alert-content">
+        <h3 id="alert-title" style="margin-top:0; color: var(--laec-blue);">Notice</h3>
+        <div id="alert-photo-area" style="display:none; margin: 15px auto;">
+            <img id="alert-passport" src="" style="width: 150px; height: 150px; border-radius: 10px; border: 3px solid var(--laec-blue); object-fit: cover;">
+        </div>
+        <p id="alert-msg"></p>
+        <div class="alert-btns">
+            <button id="alert-ok" class="btn-primary" onclick="closeAlert()">CONTINUE</button>
+            <button id="alert-cancel" class="btn-danger" style="display:none;" onclick="closeAlert()">CANCEL</button>
+            <button id="alert-confirm" class="btn-success" style="display:none;">CONFIRM</button>
+        </div>
+    </div>
+</div>
+
+<header>
+    <div class="header-top-row">
+        <div class="brand">
+            <button class="menu-toggle" onclick="toggleNav()">MENU</button>
+            <img src="/nicegene_logo.png" alt="LAEC">
+            <span>ICT CENTER</span>
+        </div>
+        <div class="header-actions">
+            <span id="school-identity" style="font-size: 0.7rem; font-weight: bold; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 50px;">Loading Identity...</span>
+            <button onclick="handleLogout()" class="logout-btn-header">Logout</button>
+        </div>
+    </div>
+
+    <nav class="nav-container" id="mainNav">
+        <div class="nav-tabs">
+            <div class="tab active" id="tab-dashboard" onclick="showTab('dashboard', this)">Overview</div>
+            <div class="tab" id="tab-register" onclick="showTab('register', this)">Registration Portal</div>
+            <div class="tab" id="tab-students" onclick="showTab('students', this)">Student Directory</div>
+            <div class="tab" id="tab-results" onclick="showTab('results', this)">School Results</div>
+            <div class="tab" id="tab-exam-center" onclick="showTab('exam-center', this)">Examination Center</div>
+            <div class="tab" id="tab-past-questions" onclick="showTab('past-questions', this)">Past Questions</div>
+            <div class="tab" id="tab-health" onclick="showTab('health', this)">System Health</div>
+        </div>
+        <button onclick="handleLogout()" class="logout-btn-drawer">Logout</button>
+    </nav>
+</header>
+
+<button class="back-to-top" id="backToTopBtn" onclick="scrollToTopPage()" aria-label="Back to top">↑</button>
+
+<div class="main-content">
+    <datalist id="reg-numbers-list"></datalist>
+    <datalist id="student-names-list"></datalist>
+
+    <div id="dashboard" class="tab-panel active">
+        <div class="control-box">
+            <div>
+                <h2 style="margin:0">School Performance Summary</h2>
+                <p id="global-mode-hint" style="opacity: 0.8; margin: 5px 0 0;">Syncing System Mode...</p>
+            </div>
+            <div>
+                <button class="btn-success" onclick="loadSchoolStats()">REFRESH DASHBOARD</button>
+            </div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card"><h4>My Registered Students</h4><div class="value" id="count-total">0</div></div>
+            <div class="stat-card" style="border-left-color: var(--laec-accent);">
+                <h4>Active Academic Session</h4>
+                <div class="value" id="current-session-display" style="font-size: 1.8rem; color: var(--laec-blue);">SYNCING...</div>
+            </div>
+            <div id="promotion-alert-banner" class="stat-card promotion-alert-card" style="display: none;" onclick="showPromotionNoticeDetails()">
+                <h4>Promotion Notice</h4>
+                <div class="value" id="promotion-alert-msg">New Alert, click to view</div>
+            </div>
+            <div class="stat-card"><h4>System Mode</h4><div class="value" id="current-mode-display" style="font-size: 1.1rem; color: var(--laec-blue);">LOADING...</div></div>
+            <div class="stat-card"><h4>Cloud Sync</h4><div class="value" id="ping-ms">-- ms</div></div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="overview-card-header">
+                    <div>
+                        <h3>Subject Performance Analytics</h3>
+                        <p id="subject-performance-note" class="overview-chart-note">Percentage representation of students' performance in each of the subjects.</p>
+                    </div>
+                </div>
+                <div class="overview-filter-row">
+                    <div style="display:flex; gap:15px; align-items:center;">
+                        <div>
+                            <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:5px;">Academic Session</label>
+                            <select id="pie-year-filter" onchange="loadSchoolStats()" style="padding:6px; border-radius:6px; border:1px solid #ddd;">
+                                <option value="YEAR#2025">2025/2026</option>
+                                <option value="YEAR#2026">2026/2027</option>
+                                <option value="YEAR#2027">2027/2028</option>
+                                <option value="YEAR#2028">2028/2029</option>
+                                <option value="YEAR#2029">2029/2030</option>
+                                <option value="YEAR#2030">2030/2031</option>
+                                <option value="YEAR#2031">2031/2032</option>
+                                <option value="YEAR#2032">2032/2033</option>
+                                <option value="YEAR#2033">2033/2034</option>
+                                <option value="YEAR#2034">2034/2035</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:5px;">Section Filter</label>
+                            <select id="subject-stage-filter" onchange="renderSubjectPerformanceChart()" style="padding:6px; border-radius:6px; border:1px solid #ddd;">
+                                <option value="ALL">All Levels</option>
+                                <option value="JUNIOR">Junior Section</option>
+                                <option value="SENIOR">Senior Section</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div style="max-width: 360px; margin: 0 auto;">
+                    <canvas id="subjectStatsChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <div class="overview-card-header">
+                    <div>
+                        <h3>School Population Histogram</h3>
+                        <p id="class-population-note" class="overview-chart-note">Showing student registration distribution across JSS1 to SS3.</p>
+                    </div>
+                </div>
+                <canvas id="classPopulationChart" height="130"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div id="register" class="tab-panel">
+        <div id="register-portal-root"></div>
+    </div>
+
+    <div id="students" class="tab-panel">
+        <div class="card">
+            <div class="grid-2">
+                <div>
+                    <label>Current School (Locked)</label>
+                    <input type="text" id="school-lock-display" readonly style="background: #f0f0f0; font-weight: bold; color: var(--laec-blue);">
+                </div>
+                <div>
+                    <label>Quick Search</label>
+                    <input type="text" id="dir-search" list="student-names-list" placeholder="Search Student Name or ID..." onkeyup="localSearch()">
+                </div>
+                <div>
+                    <label>Filter By Class</label>
+                    <select id="dir-class-filter" onchange="getStudentsFromLambda()">
+                        <option value="ALL">All Classes</option>
+                        <option value="JSS1">JSS 1</option><option value="JSS2">JSS 2</option><option value="JSS3">JSS 3</option>
+                        <option value="SS1">SS 1</option><option value="SS2">SS 2</option><option value="SS3">SS 3</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:15px">
+                <button class="btn-primary" onclick="getStudentsFromLambda()">LOAD MY DIRECTORY</button>
+                <button class="btn-success" onclick="exportStudentData()">DOWNLOAD EXCEL EXPORT</button>
+                <button class="btn-primary" onclick="downloadStudentCredentialPdf()">DOWNLOAD PDF</button>
+            </div>
+            <div style="margin-top:18px; padding-top:16px; border-top:1px solid #e5edf6;">
+                <h3 style="margin:0 0 10px; font-size:0.95rem; color:var(--laec-blue);">Student Subject Editor</h3>
+                <div class="grid-2">
+                    <div>
+                        <label>Select Student</label>
+                        <select id="subject-editor-student" onchange="loadStudentSubjectEditor()">
+                            <option value="">Load directory, then choose student...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Current Subjects</label>
+                        <input type="text" id="subject-editor-summary" readonly value="No student selected" style="background:#f7f9fc;">
+                    </div>
+                </div>
+                <div id="subject-editor-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:8px; max-height:260px; overflow:auto; margin-top:12px; padding:10px; border:1px solid #dbe6f2; border-radius:10px; background:#f8fbff;"></div>
+                <div style="display:flex; gap:10px; margin-top:12px;">
+                    <button class="btn-primary" onclick="saveStudentSubjectEditor()">SAVE SUBJECT CHANGES</button>
+                    <button style="background:#eef2f7; color:#344054; border:1px solid #cfd8e3; border-radius:8px; padding:10px 14px; font-weight:700; cursor:pointer;" onclick="clearStudentSubjectEditor()">CLEAR SELECTION</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table id="studentTable">
+                <thead><tr><th>S/N</th><th>Photo</th><th>Full Name</th><th>Reg ID</th><th>Class</th><th>Date</th><th colspan="3" style="text-align: center;">Actions</th></tr></thead>
+                <tbody id="student-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="results" class="tab-panel">
+        <div class="card">
+            <h3>School Results Archive</h3>
+            <div class="grid-2">
+                <div><label>Academic Year</label><select id="res-year"><option value="2025/2026">2025/2026</option><option value="2026/2027">2026/2027</option><option value="2027/2028">2027/2028</option><option value="2028/2029">2028/2029</option><option value="2029/2030">2029/2030</option><option value="2030/2031">2030/2031</option><option value="2031/2032">2031/2032</option><option value="2032/2033">2032/2033</option><option value="2033/2034">2033/2034</option><option value="2034/2035">2034/2035</option></select></div>
+                <div><label>Term</label><select id="res-term"><option value="TERM1">1ST TERM</option><option value="TERM2">2ND TERM</option><option value="TERM3">3RD TERM</option></select></div>
+                <div><label>Target Category</label><select id="res-category"><option value="CA1">CA 1</option><option value="CA2">CA 2</option><option value="EXAM" selected>EXAM</option><option value="ALL_CUMULATIVE" style="font-weight: bold; color: var(--laec-blue);">All Results</option></select></div>
+                <div><label>Result Mode (Joint/Internal)</label>
+                    <select id="res-mode">
+                        <option value="MODE_A">MODE A (JOINT EXAM)</option>
+                        <option value="MODE_B" selected>MODE B (INTERNAL EXAM)</option>
+                    </select>
+                </div>
+                <div><label>Subject</label><input type="text" id="res-subject" list="res-subject-options" value="" placeholder="Type or choose a subject" oninput="localResultSearch()"><datalist id="res-subject-options">
+                    <optgroup label="Core Compulsory Subjects">
+                        <option value="MATHEMATICS">Mathematics</option>
+                        <option value="ENGLISH_LANGUAGE">English Language</option>
+                        <option value="CITIZENSHIP_HERITAGE">Citizenship & Heritage Studies</option>
+                        <option value="DIGITAL_TECHNOLOGY">Digital Technology (ICT)</option>
+                        <option value="CIVIC_EDUCATION">Civic Education</option>
+                        <option value="CRS">Christian Religious Studies (CRS)</option>
+                        <option value="NIGERIAN_LANGUAGE">Nigerian Language (Yoruba/Igbo/Hausa)</option>
+                    </optgroup>
+                    <optgroup label="Junior Secondary Subjects">
+                        <option value="INTERMEDIATE_SCIENCE">Intermediate Science (B/ Science)</option>
+                        <option value="BASIC_TECH">Basic Tech</option>
+                        <option value="BUSINESS_STUDIES">Business Studies</option>
+                        <option value="NIGERIAN_HISTORY">Nigerian History</option>
+                        <option value="HISTORY">History</option>
+                        <option value="NATIONAL_VALUES">National Values (NVE)</option>
+                        <option value="BASIC_SCIENCE_TECHNOLOGY">Basic Science and Technology (BST)</option>
+                        <option value="HOME_ECONOMICS">Home Economics</option>
+                        <option value="CIVIC_SECURITY">Civic & Security Studies</option>
+                        <option value="AGRIC_SCIENCE_JSS">Agric</option>
+                        <option value="SOCIAL_CITIZENSHIP_STUDIES">Social & Citizenship Studies</option>
+                        <option value="MUSIC">Music</option>
+                        <option value="FINE_ART">Fine Art</option>
+                        <option value="CCA">Cultural & Creative Arts</option>
+                        <option value="PHE">Physical & Health Education</option>
+                        <option value="FRENCH">French (Optional)</option>
+                    </optgroup>
+                    <optgroup label="Senior Science & Maths">
+                        <option value="BIOLOGY">Biology</option>
+                        <option value="CHEMISTRY">Chemistry</option>
+                        <option value="PHYSICS">Physics</option>
+                        <option value="FURTHER_MATHEMATICS">Further Mathematics</option>
+                        <option value="AGRIC_SCIENCE_SSS">Agricultural Science</option>
+                        <option value="PHE">Physical Health Education</option>
+                        <option value="GEOGRAPHY">Geography</option>
+                        <option value="TECHNICAL_DRAWING">Technical Drawing</option>
+                        <option value="BASIC_ELECTRICITY">Basic Electricity</option>
+                        <option value="FOOD_NUTRITION">Foods and Nutrition</option>
+                    </optgroup>
+                    <optgroup label="Senior Arts & Humanities">
+                        <option value="LITERATURE_IN_ENGLISH">Literature in English</option>
+                        <option value="GOVERNMENT">Government</option>
+                        <option value="HISTORY">History</option>
+                        <option value="FRENCH">French</option>
+                        <option value="YORUBA">Yoruba</option>
+                        <option value="VISUAL_ARTS">Visual Arts</option>
+                        <option value="MUSIC">Music</option>
+                        <option value="HOME_MANAGEMENT">Home Management</option>
+                        <option value="CRS">Christian Religious Studies (CRS)</option>
+                    </optgroup>
+                    <optgroup label="Senior Commercial">
+                        <option value="ECONOMICS">Economics</option>
+                        <option value="COMMERCE">Commerce</option>
+                        <option value="FINANCIAL_ACCOUNTING">Accounting</option>
+                        <option value="MARKETING">Marketing</option>
+                        <option value="FURTHER_MATHEMATICS">Further Mathematics (Business)</option>
+                        <option value="GOVERNMENT">Government</option>
+                        <option value="OFFICE_PRACTICE">Office Practice</option>
+                    </optgroup>
+                    <optgroup label="New Trade & Entrepreneurship">
+                        <option value="SOLAR_PV_INSTALLATION">Solar PV Installation & Maintenance</option>
+                        <option value="FASHION_DESIGN">Garment Making and Fashion Designing</option>
+                        <option value="LIVESTOCK_FARMING">Livestock Farming</option>
+                        <option value="BEAUTY_COSMETOLOGY">Beauty & Cosmetology</option>
+                        <option value="COMPUTER_GSM_REPAIR">Computer Hardware & GSM Repairs</option>
+                        <option value="HORTICULTURE_CROP">Horticulture</option>
+                        <option value="DATA_PROCESSING">Data Processing</option>
+                        <option value="CATERING_CRAFT">Catering Craft Practice</option>
+                        <option value="ANIMAL_HUSBANDRY">Animal Husbandry</option>
+                        <option value="BOOK_KEEPING">Book-Keeping</option>
+                        <option value="PHOTOGRAPHY">Photography</option>
+                    </optgroup>
+                </datalist></div>
+                <div><label>Class</label><select id="res-class" onchange="localResultSearch()">
+                    <option value="ALL">All Classes</option>
+                    <option value="JSS1">JSS 1</option><option value="JSS2">JSS 2</option><option value="JSS3">JSS 3</option>
+                    <option value="SS1">SS 1</option><option value="SS2">SS 2</option><option value="SS3">SS 3</option>
+                </select></div>
+                <div><label>Filter By Student Name</label><input type="text" id="res-reg-filter" list="reg-numbers-list" placeholder="Type student name" onkeyup="localResultSearch()"></div>
+            </div>
+            <div class="filter-action-cell">
+                <label>&nbsp;</label>
+                <div class="filter-action-buttons">
+                    <button class="btn-primary" onclick="loadSchoolResults()">LOAD RESULTS</button>
+                    <button class="btn-warning" onclick="remarkLoadedResults()">REMARK</button>
+                    <button class="btn-success" onclick="exportToExcel('resultsTable', 'School_Results')">DOWNLOAD SPREADSHEET</button>
+                    <button class="btn-danger" onclick="deleteSelectedSubjectResults()">DELETE SUBJECT RESULTS</button>
+                </div>
+            </div>
+        </div>
+        <div class="result-scroll-shell">
+            <button type="button" class="result-scroll-btn result-scroll-left" aria-label="Scroll results left" onclick="scrollResultsTable(-1)">&lt;</button>
+            <button type="button" class="result-scroll-btn result-scroll-right" aria-label="Scroll results right" onclick="scrollResultsTable(1)">&gt;</button>
+            <div class="table-responsive">
+                <table id="resultsTable">
+                    <thead id="results-thead"></thead>
+                    <tbody id="results-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="exam-center" class="tab-panel">
+        <div class="control-box">
+            <div>
+                <h2 style="margin:0">Internal Exam Control</h2>
+                <p id="local-mode-hint" style="opacity: 0.8; margin: 5px 0 0;">Current: SYNCING MODE...</p>
+            </div>
+            <div class="mode-toggle-group">
+                <button id="mode-a-btn" class="mode-btn" onclick="toggleLocalMode('MODE_A')">MODE A (JOINT)</button>
+                <button id="mode-b-btn" class="mode-btn" onclick="toggleLocalMode('MODE_B')">MODE B (INTERNAL)</button>
+            </div>
+        </div>
+
+        <div class="card" style="border-top: 5px solid var(--laec-blue);">
+            <h3 style="color: var(--laec-blue);">⚙️ Examination Global Settings</h3>
+            <div class="grid-2">
+                <div>
+                    <label>Active Category</label>
+                    <select id="global-exam-type" onchange="handleCategoryChange()">
+                        <option value="#">...Select Category...</option><option value="CA1">CA 1</option><option value="CA2">CA 2</option><option value="EXAM">Exam</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Default Safety Timer (Optional HH:MM:SS)</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="number" id="timer-h" placeholder="HH" style="text-align: center;">
+                        <input type="number" id="timer-m" placeholder="MM" style="text-align: center;">
+                        <input type="number" id="timer-s" placeholder="SS" style="text-align: center;">
+                    </div>
+                </div>
+            </div>
+            <div id="exam-session-root"></div>
+            <button class="btn-primary" style="margin-top:20px; width:100%" onclick="updateExamGlobal()">SYNC INTERNAL SESSION SETTINGS</button>
+        </div>
+
+        <div class="grid-2">
+            <div class="card" style="border-top: 5px solid var(--success);">
+                <h3 style="color: var(--success);">🚀 Internal Question Blaster</h3>
+                <label>Target Category</label>
+                <select id="blast-session" style="border-left: 4px solid var(--success);">
+                    <option value="CA1">CA 1</option>
+                    <option value="CA2">CA 2</option>
+                    <option value="EXAM">EXAM</option>
+                </select>
+
+                <div style="margin-top: 15px; padding: 12px; background: #f0fff4; border-radius: 8px; border: 1px dashed var(--success);">
+                    <label style="color: var(--success);">Student Exam Duration (HH:MM:SS)</label>
+                    <div style="display:flex; gap:8px; margin-top: 5px;">
+                        <input type="number" id="blast-h" placeholder="HH" style="text-align: center; background: white;">
+                        <input type="number" id="blast-m" placeholder="MM" style="text-align: center; background: white;">
+                        <input type="number" id="blast-s" placeholder="SS" style="text-align: center; background: white;">
+                    </div>
+                    <p style="font-size: 10px; color: #555; margin-top: 8px; font-style: italic;">* Mandatory: Paper-specific writing time.</p>
+                </div>
+
+                <label style="margin-top: 10px;">Upload Question Pool (Excel)</label>
+                <input type="file" id="excel-blast" accept=".xlsx, .xls" style="margin-bottom: 10px;">
+                <label style="margin-top: 10px;">Assessment Specific Instruction</label>
+                <textarea id="blast-instruction" rows="4" placeholder="Example: Answer all questions. Use the diagram supplied for questions 4-6." style="width:100%; box-sizing:border-box; margin-bottom:10px; resize:vertical;"></textarea>
+                <p style="margin: 0 0 10px; font-size: 0.78rem; color: #5f7087; line-height: 1.5;">Go-live subject control now lives in the internal session settings card above. Use this blaster only to upload papers and set the compulsory student timer for that paper batch.</p>
+                
+                <button class="btn-success" style="width:100%; font-weight: 800; padding: 15px;" onclick="handleBulkBlast()">START SYNCHRONIZED BLAST</button>
+            </div>
+
+            <div class="card" style="border-top: 5px solid var(--laec-accent);">
+                <h3 style="color: var(--laec-blue);">🖼️ Internal Diagram Hosting</h3>
+                <label>Upload Image</label>
+                <input type="file" id="img-hosting" accept="image/*" style="margin-bottom: 10px;">
+                <button class="btn-primary" style="width:100%;" onclick="uploadQuestionImage()">GET CLOUD LINK</button>
+                
+                <div id="hosting-result-area" class="hidden" style="margin-top: 15px; padding: 12px; background: #eef5ff; border-radius: 8px; border: 1px solid var(--laec-blue);">
+                    <label style="color: var(--laec-blue); font-size: 10px;">Cloud URL (Paste into your Excel):</label>
+                    <div style="display: flex; gap: 5px; margin-top: 5px;">
+                        <input type="text" id="generated-url-field" readonly style="flex: 1; padding: 8px; font-size: 11px; background: white;">
+                        <button class="btn-success" style="padding: 5px 12px; font-size: 11px;" onclick="copyDiagramURL()">COPY</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="past-questions" class="tab-panel">
+        <div class="card">
+            <h3>Global Archive Access</h3>
+            <div class="grid-2">
+                <div><label>Question Source (Mode)</label>
+                    <select id="pq-mode">
+                        <option value="MODE_A">MODE A (GLOBAL QUESTIONS)</option>
+                        <option value="MODE_B">MODE B (INTERNAL QUESTIONS)</option>
+                    </select>
+                </div>
+                <div><label>Subject</label><select id="pq-subject">
+                    <option value="#">....Select Subject....</option>
+                    <optgroup label="Core Compulsory Subjects">
+                        <option value="MATHEMATICS">Mathematics</option>
+                        <option value="ENGLISH_LANGUAGE">English Language</option>
+                        <option value="CITIZENSHIP_HERITAGE">Citizenship & Heritage Studies</option>
+                        <option value="DIGITAL_TECHNOLOGY">Digital Technology (ICT)</option>
+                        <option value="CIVIC_EDUCATION">Civic Education</option>
+                        <option value="CRS">Christian Religious Studies (CRS)</option>
+                        <option value="NIGERIAN_LANGUAGE">Nigerian Language (Yoruba/Igbo/Hausa)</option>
+                    </optgroup>
+                    <optgroup label="Junior Secondary Subjects">
+                        <option value="INTERMEDIATE_SCIENCE">Intermediate Science (B/ Science)</option>
+                        <option value="BASIC_TECH">Basic Tech</option>
+                        <option value="BUSINESS_STUDIES">Business Studies</option>
+                        <option value="NIGERIAN_HISTORY">Nigerian History</option>
+                        <option value="HISTORY">History</option>
+                        <option value="NATIONAL_VALUES">National Values (NVE)</option>
+                        <option value="BASIC_SCIENCE_TECHNOLOGY">Basic Science and Technology (BST)</option>
+                        <option value="HOME_ECONOMICS">Home Economics</option>
+                        <option value="CIVIC_SECURITY">Civic & Security Studies</option>
+                        <option value="AGRIC_SCIENCE_JSS">Agric</option>
+                        <option value="SOCIAL_CITIZENSHIP_STUDIES">Social & Citizenship Studies</option>
+                        <option value="MUSIC">Music</option>
+                        <option value="FINE_ART">Fine Art</option>
+                        <option value="CCA">Cultural & Creative Arts</option>
+                        <option value="PHE">Physical & Health Education</option>
+                        <option value="FRENCH">French (Optional)</option>
+                    </optgroup>
+                    <optgroup label="Senior Science & Maths">
+                        <option value="BIOLOGY">Biology</option>
+                        <option value="CHEMISTRY">Chemistry</option>
+                        <option value="PHYSICS">Physics</option>
+                        <option value="FURTHER_MATHEMATICS">Further Mathematics</option>
+                        <option value="AGRIC_SCIENCE_SSS">Agricultural Science</option>
+                        <option value="PHE">Physical Health Education</option>
+                        <option value="GEOGRAPHY">Geography</option>
+                        <option value="TECHNICAL_DRAWING">Technical Drawing</option>
+                        <option value="BASIC_ELECTRICITY">Basic Electricity</option>
+                        <option value="FOOD_NUTRITION">Foods and Nutrition</option>
+                    </optgroup>
+                    <optgroup label="Senior Arts & Humanities">
+                        <option value="LITERATURE_IN_ENGLISH">Literature in English</option>
+                        <option value="GOVERNMENT">Government</option>
+                        <option value="HISTORY">History</option>
+                        <option value="FRENCH">French</option>
+                        <option value="YORUBA">Yoruba</option>
+                        <option value="VISUAL_ARTS">Visual Arts</option>
+                        <option value="MUSIC">Music</option>
+                        <option value="HOME_MANAGEMENT">Home Management</option>
+                        <option value="CRS">Christian Religious Studies (CRS)</option>
+                    </optgroup>
+                    <optgroup label="Senior Commercial">
+                        <option value="ECONOMICS">Economics</option>
+                        <option value="COMMERCE">Commerce</option>
+                        <option value="FINANCIAL_ACCOUNTING">Accounting</option>
+                        <option value="MARKETING">Marketing</option>
+                        <option value="FURTHER_MATHEMATICS">Further Mathematics (Business)</option>
+                        <option value="GOVERNMENT">Government</option>
+                        <option value="OFFICE_PRACTICE">Office Practice</option>
+                    </optgroup>
+                    <optgroup label="New Trade & Entrepreneurship">
+                        <option value="SOLAR_PV_INSTALLATION">Solar PV Installation & Maintenance</option>
+                        <option value="FASHION_DESIGN">Garment Making and Fashion Designing</option>
+                        <option value="LIVESTOCK_FARMING">Livestock Farming</option>
+                        <option value="BEAUTY_COSMETOLOGY">Beauty & Cosmetology</option>
+                        <option value="COMPUTER_GSM_REPAIR">Computer Hardware & GSM Repairs</option>
+                        <option value="HORTICULTURE_CROP">Horticulture</option>
+                        <option value="DATA_PROCESSING">Data Processing</option>
+                        <option value="CATERING_CRAFT">Catering Craft Practice</option>
+                        <option value="ANIMAL_HUSBANDRY">Animal Husbandry</option>
+                        <option value="BOOK_KEEPING">Book-Keeping</option>
+                        <option value="PHOTOGRAPHY">Photography</option>
+                    </optgroup>
+                </select></div>
+                <div><label>Term Filter</label>
+                    <select id="pq-term">
+                        <option value="TERM1">Term 1</option>
+                        <option value="TERM2">Term 2</option>
+                        <option value="TERM3">Term 3</option>
+                    </select>
+                </div>
+                <div><label>Target Category</label><select id="pq-type">
+                    <option value="CA1">CA 1</option>
+                    <option value="CA2">CA 2</option>
+                    <option value="EXAM">EXAM</option>
+                </select></div>
+                <div><label>Year</label><select id="pq-year">
+                    <option value="2025/2026">2025/2026</option><option value="2026/2027">2026/2027</option>
+                    <option value="2027/2028">2027/2028</option>
+                    <option value="2028/2029">2028/2029</option>
+                    <option value="2029/2030">2029/2030</option>
+                    <option value="2030/2031">2030/2031</option>
+                    <option value="2031/2032">2031/2032</option>
+                    <option value="2032/2033">2032/2033</option>
+                    <option value="2033/2034">2033/2034</option>
+                    <option value="2034/2035">2034/2035</option>
+                </select></div>
+                <div><label>Target Class</label><select id="pq-class">
+                    <option value="JSS1">JSS1</option>
+                    <option value="JSS2">JSS2</option>
+                    <option value="JSS3">JSS3</option>
+                    <option value="SS1" selected>SS1</option>
+                    <option value="SS2">SS2</option>
+                    <option value="SS3">SS3</option>
+                </select></div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px">
+                <button class="btn-primary" onclick="loadPastQuestions()">LOAD QUESTIONS</button>
+                <button class="btn-success" onclick="exportToExcel('pqTable', 'Question_Archive_Export')">DOWNLOAD QUESTIONS</button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table id="pqTable">
+                <thead><tr><th>SN</th><th>Subject</th><th>Class</th><th>Type</th><th>Question text</th></tr></thead>
+                <tbody id="pq-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="health" class="tab-panel">
+        <div class="card" style="text-align:center; padding: 2rem 1rem">
+            <h3>Cloud Heartbeat details (Latency Nigeria to USA)</h3>
+            <h1 id="ping-large" style="font-size: 5rem; margin: 0; color: var(--laec-blue);">--</h1>
+            <p id="ping-status" style="font-weight: bold">Monitoring Region us-east-1...</p>
+        </div>
+
+        <div class="card" style="border-top: 5px solid var(--danger);">
+            <h3>Real-Time Proctoring & Invigilation Monitor</h3>
+            <p style="font-size: 0.8rem; color: #666; margin-bottom: 1.5rem;">🚨 <b>Internal Oversight:</b> Strictly monitoring flagged violations for this college.</p>
+            
+            <div class="grid-2" style="margin-bottom: 20px;">
+                <div><label>Academic Year</label><select id="invigilator-year-filter">
+                    <option value="2025/2026">2025/2026</option><option value="2026/2027">2026/2027</option><option value="2027/2028">2027/2028</option><option value="2028/2029">2028/2029</option><option value="2029/2030">2029/2030</option><option value="2030/2031">2030/2031</option><option value="2031/2032">2031/2032</option><option value="2032/2033">2032/2033</option><option value="2033/2034">2033/2034</option><option value="2034/2035">2034/2035</option>
+                </select></div>
+                <div><label>Term</label><select id="invigilator-term-filter">
+                    <option value="TERM1">1st Term</option><option value="TERM2">2nd Term</option><option value="TERM3">3rd Term</option>
+                </select></div>
+                <div>
+                    <label>Violation Mode Filter</label>
+                    <select id="invigilator-mode-filter">
+                        <option value="MODE_B">Internal Exam (Mode B)</option>
+                    </select>
+                </div>
+                <div><label>Class</label><select id="invigilator-class-filter" onchange="refreshInvigilatorFeed()">
+                    <option value="ALL">All Classes</option>
+                    <option value="JSS1">JSS 1</option><option value="JSS2">JSS 2</option><option value="JSS3">JSS 3</option>
+                    <option value="SS1">SS 1</option><option value="SS2">SS 2</option><option value="SS3">SS 3</option>
+                </select></div>
+                <div><label>Subject</label><input type="text" id="invigilator-subject-filter" list="res-subject-options" value="" placeholder="Type or choose subject" onchange="refreshInvigilatorFeed()"></div>
+                <div style="display: flex; align-items: flex-end; gap: 10px;">
+                    <button class="btn-primary" style="flex: 1; border-radius:4px; padding:10px 14px;" onclick="refreshInvigilatorFeed()">REFRESH MONITOR</button>
+                    <button class="btn-danger" style="flex: 1; border-radius:4px; padding:10px 14px;" onclick="deleteFilteredFlaggedResults()">DELETE FILTERED FLAGGED RESULTS</button>
+                    <button class="btn-success" style="flex: 1; border-radius:4px; padding:10px 14px;" onclick="exportToExcel('invigilatorTable', 'Security_Violation_Log')">DOWNLOAD VIOLATION LOG</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="invigilatorTable">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Student Name</th>
+                            <th>School</th>
+                            <th>Class</th>
+                            <th>Subject</th>
+                            <th>Exam Category</th>
+                            <th>Violation Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invigilator-feed-body">
+                        <tr><td colspan="7" style="text-align:center; color:#999;">Waiting for live activity...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="system-footer" style="width: 100%; padding: 20px 0; background: var(--border); border-top: 1px solid var(--border); margin-top: auto; text-align: center;">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 0 20px;">
+        <p style="margin: 5px 0 0; font-size: 0.65rem; font-weight: 500; color: #7f8c8d; text-transform: uppercase; letter-spacing: 2px;">
+            LAEC CLOUD-BASED INTEGRATED EXAMINATION MANAGEMENT SYSTEM
+        </p>
+        <p style="margin: 0; font-size: 0.8rem; color: #7f8c8d; font-weight: 500; letter-spacing: 0.5px;">
+            &copy; <span id="copyright-year"></span> 
+            <span style="color: var(--laec-blue); font-weight: 700;">NICEGENE TECHNOLOGIES</span>. 
+            All Rights Reserved.
+        </p>
+        
+    </div>
+</footer>
+
+<script>
+    const LOGGED_IN_SCHOOL_ID = localStorage.getItem('SchoolID') || "SFC"; 
+    const LAEC = window.LAEC_UTILS;
+    const SCHOOL_NAMES = { "SFC": "St. Finbarr’s College", "SGC": "St. Gregory College", "HCC": "Holy Child College", "MCSS": "Maryland Comprehensive", "STAC": "St. Thomas Aquinas College", "OLASS": "Our Lady of Apostles", "MEC": "Mater Ecclesia College", "SKC": "St. Kizito’s College", "MGC": "Marywood Girl’s College", "SHC": "Sacred Heart College" };
+
+    let schoolPopulationChart = null;
+    let subjectPerformanceChart = null;
+    let masterStudentList = [];
+    let masterResultList = [];
+    let renderedResultList = [];
+    let lastInvigilatorFlaggedResults = [];
+    let ACTIVE_SYNC_TERM = "TERM1";
+    let ACTIVE_SYNC_YEAR = "2025/2026";
+    let ACTIVE_OVERVIEW_YEAR = "2025/2026";
+
+    const DashboardAnalytics = window.LAECDashboardAnalytics;
+
+    function formatTermLabel(term) {
+        if (!term) return "current term";
+        return term.replace("TERM", "Term ");
+    }
+
+    function sessionFilterToAcademicYear(value) {
+        if (!value) return ACTIVE_SYNC_YEAR;
+        if (value.startsWith("YEAR#")) {
+            const startYear = parseInt(value.split("#")[1], 10);
+            if (Number.isFinite(startYear)) return `${startYear}/${startYear + 1}`;
+        }
+        return value;
+    }
+
+    function academicYearToSessionFilter(year) {
+        const startYear = parseInt(String(year || "").split("/")[0], 10);
+        return Number.isFinite(startYear) ? `YEAR#${startYear}` : "";
+    }
+
+    function getAcademicYearStart(value) {
+        if (!value) return NaN;
+        if (String(value).startsWith("YEAR#")) return parseInt(String(value).split("#")[1], 10);
+        return parseInt(String(value).split("/")[0], 10);
+    }
+
+    function ensureAcademicYearOptions(select, activeYear, formatter = null) {
+        if (!select) return;
+        const currentYearStart = getAcademicYearStart(activeYear);
+        const existingStarts = Array.from(select.options)
+            .map((option) => getAcademicYearStart(option.value || option.textContent))
+            .filter(Number.isFinite);
+        const maxExistingStart = existingStarts.length ? Math.max(...existingStarts) : 2025;
+        const maxStart = Math.max(maxExistingStart, Number.isFinite(currentYearStart) ? currentYearStart + 1 : 2025);
+
+        for (let start = 2025; start <= maxStart; start += 1) {
+            const year = `${start}/${start + 1}`;
+            const optionValue = typeof formatter === 'function' ? formatter(year) : year;
+            if (!Array.from(select.options).some((option) => option.value === optionValue)) {
+                const option = document.createElement('option');
+                option.value = optionValue;
+                option.textContent = select.id === 'pie-year-filter' ? `${year} Session` : year;
+                select.appendChild(option);
+            }
+        }
+    }
+
+    function syncAcademicYearSelect(selectId, year, formatter = null) {
+        const select = document.getElementById(selectId);
+        if (!select || !year) return;
+        ensureAcademicYearOptions(select, year, formatter);
+
+        const optionValue = typeof formatter === 'function' ? formatter(year) : year;
+        if (!optionValue) return;
+
+        const exists = Array.from(select.options).some(option => option.value === optionValue);
+        if (!exists) {
+            const option = document.createElement('option');
+            option.value = optionValue;
+            option.textContent = selectId === 'pie-year-filter' ? `${year} Session` : year;
+            select.appendChild(option);
+        }
+        select.value = optionValue;
+    }
+
+    function syncOverviewYearFilter(year) {
+        syncAcademicYearSelect('pie-year-filter', year, academicYearToSessionFilter);
+        syncAcademicYearSelect('res-year', year);
+        syncAcademicYearSelect('pq-year', year);
+        syncAcademicYearSelect('invigilator-year-filter', year);
+    }
+
+    function getResultPercentage(result) {
+        const explicit = Number(result.Percentage ?? result.percentage);
+        if (Number.isFinite(explicit)) return explicit;
+
+        const score = Number(result.Score ?? result.score);
+        const total = Number(result.Total ?? result.total);
+        if (Number.isFinite(score) && Number.isFinite(total) && total > 0) {
+            return Math.round((score / total) * 100);
+        }
+
+        return Number.isFinite(score) ? score : 0;
+    }
+
+    function formatResultScore(result) {
+        const score = Number(result.Score ?? result.score);
+        const total = Number(result.Total ?? result.total);
+        const percentage = getResultPercentage(result);
+        const script = parseResultScriptForScore(result);
+        const uploaded = Number(result.UploadedQuestions ?? result.QuestionCount ?? result.TotalQuestions ?? result.UploadedTotal);
+        const scriptUploaded = script.length;
+        const totalUploaded = Number.isFinite(uploaded) && uploaded > 0 ? uploaded : (scriptUploaded || total);
+        const attempted = getAttemptedQuestionCount(result, script, totalUploaded);
+        const correct = getCorrectQuestionCount(result, script, totalUploaded, percentage);
+
+        if (Number.isFinite(correct) && Number.isFinite(attempted) && Number.isFinite(totalUploaded) && totalUploaded > 0) {
+            return `${correct} / ${attempted} / ${totalUploaded} (${percentage}%)`;
+        }
+
+        return Number.isFinite(percentage) ? `${percentage}%` : (result.Score || 'N/A');
+    }
+
+    function parseResultScriptForScore(result) {
+        if (Array.isArray(result.AnswerScript)) return result.AnswerScript;
+        if (Array.isArray(result.answerScript)) return result.answerScript;
+        if (Array.isArray(result.Script)) return result.Script;
+        if (typeof result.AnswerScript === "string" && result.AnswerScript.trim()) {
+            try { const parsed = JSON.parse(result.AnswerScript); return Array.isArray(parsed) ? parsed : []; } catch (e) { return []; }
+        }
+        return [];
+    }
+
+    function getCorrectQuestionCount(result, script, totalUploaded, percentage) {
+        const explicitCorrect = Number(result.CorrectQuestions);
+        if (Number.isFinite(explicitCorrect) && explicitCorrect > 0) return explicitCorrect;
+        const passed = Number(result.PassedQuestions);
+        if (Number.isFinite(passed) && passed > 0) return passed;
+        if (script.length > 0) return script.filter((item) => item.IsCorrect).length;
+        const score = Number(result.Score ?? result.score);
+        if (Number.isFinite(score)) return score;
+        if (Number.isFinite(percentage) && Number.isFinite(totalUploaded) && totalUploaded > 0) {
+            return Math.round((percentage / 100) * totalUploaded);
+        }
+        return NaN;
+    }
+
+    function getAttemptedQuestionCount(result, script, fallbackTotal) {
+        const explicit = Number(result.AttemptedQuestions ?? result.QuestionsAttempted ?? result.Attempted);
+        if (Number.isFinite(explicit) && explicit > 0) return explicit;
+        if (script.length > 0) {
+            const attempted = script.filter((item) => {
+                if (String(item.QuestionType || "").toUpperCase() === "THEORY") return false;
+                const answer = String(item.StudentAnswer ?? "").trim();
+                return answer !== "" && answer.toUpperCase() !== "BLANK";
+            }).length;
+            return attempted;
+        }
+        return Number.isFinite(fallbackTotal) ? fallbackTotal : 0;
+    }
+
+    function formatResultStatus(result) {
+        const status = String(result.Status || result.status || '').toUpperCase();
+        if (status === 'FLAGGED') {
+            return `<span style="color:var(--warning); font-weight:bold">FLAGGED</span>`;
+        }
+
+        const percentage = getResultPercentage(result);
+        const isPass = percentage >= 50;
+        return `<span style="color:${isPass ? 'green' : 'red'}">${isPass ? 'PASS' : 'FAIL'}</span>`;
+    }
+
+    function formatResultStatusAction(result) {
+        const pk = escapeAttr(result.PK || '');
+        const sk = escapeAttr(result.SK || '');
+        return `<div style="display:flex; align-items:flex-start; justify-content:center; gap:6px;">
+            ${formatResultStatus(result)}
+            <details>
+                <summary style="list-style:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; border:1px solid #cbd5e1; background:#f8fafc; color:var(--laec-blue); font-weight:bold;">+</summary>
+                <div style="min-width:120px; margin-top:6px; padding:8px; background:white; border:1px solid #dbe6f2; border-radius:8px; box-shadow:0 6px 14px rgba(15,23,42,.12);">
+                    <div style="font-size:10px; font-weight:bold; color:#475467; margin-bottom:6px;">${formatResultStatus(result)}</div>
+                    <button class="btn-danger" style="width:100%; padding:6px 10px; font-size:10px;" onclick="confirmDeleteResult('${pk}', '${sk}')">DELETE</button>
+                </div>
+            </details>
+        </div>`;
+    }
+
+    function renderClassPopulationChart(students) {
+        const ctx = document.getElementById('classPopulationChart');
+        const note = document.getElementById('class-population-note');
+        const metrics = DashboardAnalytics ? DashboardAnalytics.buildClassPopulationMetrics(students, { utils: LAEC }) : [];
+        if (!ctx) return;
+
+        if (schoolPopulationChart) schoolPopulationChart.destroy();
+        schoolPopulationChart = new Chart(ctx.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: metrics.map(metric => metric.label),
+                datasets: [{
+                    label: 'Students',
+                    data: metrics.map(metric => metric.count),
+                    backgroundColor: '#123a63',
+                    borderRadius: 8,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            }
+        });
+
+        if (note) {
+            note.innerHTML = `Showing student registration across <strong>${metrics.length}</strong> class levels. Total: <strong>${students.length}</strong>.`;
+        }
+    }
+
+    function renderSubjectPerformanceChart(results) {
+        const ctx = document.getElementById('subjectStatsChart');
+        const note = document.getElementById('subject-performance-note');
+        const stageFilter = document.getElementById('subject-stage-filter');
+        const stage = stageFilter ? stageFilter.value : 'ALL';
+        const metrics = DashboardAnalytics
+            ? DashboardAnalytics.buildSubjectPassMetrics(results || masterResultList, { stage, utils: LAEC })
+            : [];
+        if (!ctx) return;
+
+        if (subjectPerformanceChart) subjectPerformanceChart.destroy();
+
+        if (!metrics.length) {
+            subjectPerformanceChart = new Chart(ctx.getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: ['No scored results'],
+                    datasets: [{
+                        data: [1],
+                        backgroundColor: ['#d8e3f0'],
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: { enabled: false }
+                    }
+                }
+            });
+            if (note) {
+                note.innerHTML = `No scored results were found for <strong>${ACTIVE_OVERVIEW_YEAR}</strong> in ${formatTermLabel(ACTIVE_SYNC_TERM)}.`;
+            }
+            return;
+        }
+
+        const chartMetrics = metrics.slice(0, 10);
+        subjectPerformanceChart = new Chart(ctx.getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: chartMetrics.map(metric => metric.label),
+                datasets: [{
+                    data: chartMetrics.map(metric => metric.passRate),
+                    backgroundColor: DashboardAnalytics.getColors(chartMetrics.length),
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } },
+                    tooltip: {
+                        callbacks: {
+                            label: (item) => {
+                                const metric = chartMetrics[item.dataIndex];
+                                return metric ? `${metric.passRate}% pass rate from ${metric.attempts} result(s)` : '';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (note) {
+            const leader = chartMetrics[0];
+            note.innerHTML = `<strong>${leader.label}</strong> leads with <strong>${leader.passRate}%</strong> pass rate in <strong>${ACTIVE_OVERVIEW_YEAR}</strong> for ${formatTermLabel(ACTIVE_SYNC_TERM)}.`;
+        }
+    }
+
+    async function fetchSchoolResults(year) {
+        const selectedYear = year || ACTIVE_SYNC_YEAR;
+        ACTIVE_OVERVIEW_YEAR = selectedYear;
+        try {
+            const baseUrl = AWS_CONFIG.getStudentsEndpoint.endsWith('/') ? AWS_CONFIG.getStudentsEndpoint : `${AWS_CONFIG.getStudentsEndpoint}/`;
+            const url = LAEC && typeof LAEC.buildApiUrl === 'function'
+                ? LAEC.buildApiUrl(baseUrl, {
+                    action: 'GET_RESULTS',
+                    schoolID: LOGGED_IN_SCHOOL_ID,
+                    year: selectedYear,
+                    term: ACTIVE_SYNC_TERM,
+                    mode: 'ALL'
+                })
+                : `${baseUrl}?action=GET_RESULTS&schoolID=${LOGGED_IN_SCHOOL_ID}&year=${selectedYear}&term=${ACTIVE_SYNC_TERM}&mode=ALL`;
+            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            const data = await response.json();
+            return data.results || [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function populateDataLists(students) {
+        const regList = document.getElementById('reg-numbers-list');
+        const studentList = document.getElementById('student-names-list');
+        const escapeValue = (value) => String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+        const nameOptions = Array.from(new Map([...(students || []), ...(masterResultList || [])]
+            .filter(item => item && (item.FullName || item.RegNo))
+            .map(item => [String(item.FullName || item.RegNo).toUpperCase(), item])).values());
+        if (regList) regList.innerHTML = nameOptions.map(student => `<option value="${escapeValue(student.FullName || student.RegNo)}">${escapeValue(student.RegNo || '')}</option>`).join('');
+        if (studentList) studentList.innerHTML = (students || []).flatMap(student => [
+            `<option value="${escapeValue(student.FullName)}">${escapeValue(student.RegNo || '')}</option>`,
+            `<option value="${escapeValue(student.RegNo)}">${escapeValue(student.FullName || '')}</option>`
+        ]).join('');
+
+        const resRegFilter = document.getElementById('res-reg-filter');
+        if (resRegFilter) resRegFilter.setAttribute('list', 'reg-numbers-list');
+        const dirSearch = document.getElementById('dir-search');
+        if (dirSearch) dirSearch.setAttribute('list', 'student-names-list');
+        populateSubjectEditorStudents(students);
+    }
+
+    function populateResultRegistrationList(results) {
+        populateDataLists([...(masterStudentList || []), ...(results || [])]);
+    }
+
+    function escapeAttr(value) {
+        return String(value || '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
+
+    function getSubjectEditorOptions() {
+        const subjects = (LAEC && Array.isArray(LAEC.STANDARD_SUBJECT_OPTIONS)) ? LAEC.STANDARD_SUBJECT_OPTIONS : [];
+        return subjects
+            .filter(subject => subject && subject !== 'ARABIC')
+            .sort((left, right) => LAEC.humanizeSubject(left).localeCompare(LAEC.humanizeSubject(right)));
+    }
+
+    function getSubjectEditorLabel(subject, studentClass = "") {
+        const isSeniorClass = /^SS/.test(LAEC.normalizeClassValue(studentClass || ""));
+        const normalizedSubject = LAEC.normalizeSubjectValue(subject);
+        const labels = {
+            AGRIC_SCIENCE_JSS: "Agric",
+            AGRIC_SCIENCE_SSS: "Agricultural Science (SSS)",
+            CIVIC_SECURITY: "Civic & Security Studies",
+            CRS: isSeniorClass ? "Christian Religious Studies (CRS) (SSS)" : "Christian Religious Studies (CRS)"
+        };
+        return labels[normalizedSubject] || LAEC.humanizeSubject(normalizedSubject);
+    }
+
+    function populateSubjectEditorStudents(students) {
+        const select = document.getElementById('subject-editor-student');
+        if (!select) return;
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">Select student to edit subjects...</option>' + (students || [])
+            .slice()
+            .sort((left, right) => String(left.FullName || '').localeCompare(String(right.FullName || '')))
+            .map(student => `<option value="${escapeAttr(student.RegNo)}">${escapeAttr(student.FullName)} - ${escapeAttr(student.RegNo)} (${escapeAttr(student.Class)})</option>`)
+            .join('');
+        if ((students || []).some(student => student.RegNo === currentValue)) {
+            select.value = currentValue;
+        }
+    }
+
+    function clearStudentSubjectEditor() {
+        const select = document.getElementById('subject-editor-student');
+        const summary = document.getElementById('subject-editor-summary');
+        const grid = document.getElementById('subject-editor-grid');
+        if (select) select.value = "";
+        if (summary) summary.value = "No student selected";
+        if (grid) grid.innerHTML = "";
+    }
+
+    function loadStudentSubjectEditor() {
+        const regNo = document.getElementById('subject-editor-student').value;
+        const summary = document.getElementById('subject-editor-summary');
+        const grid = document.getElementById('subject-editor-grid');
+        const student = masterStudentList.find(item => item.RegNo === regNo);
+        if (!student) {
+            clearStudentSubjectEditor();
+            return;
+        }
+
+        const selectedSubjects = new Set((student.Subjects || []).map(subject => LAEC.normalizeSubjectValue(subject)));
+        summary.value = selectedSubjects.size
+            ? Array.from(selectedSubjects).map(subject => getSubjectEditorLabel(subject, student.Class)).join(', ')
+            : "No subjects selected yet";
+        grid.innerHTML = getSubjectEditorOptions().map(subject => {
+            const checked = selectedSubjects.has(subject) ? "checked" : "";
+            return `<label style="display:flex; align-items:center; gap:8px; background:white; border:1px solid #e1e8f0; border-radius:8px; padding:8px; font-size:0.75rem; font-weight:700; color:#344054;">
+                <input type="checkbox" class="subject-editor-check" value="${escapeAttr(subject)}" ${checked} style="width:auto;">
+                <span>${escapeAttr(getSubjectEditorLabel(subject, student.Class))}</span>
+            </label>`;
+        }).join('');
+    }
+
+    async function saveStudentSubjectEditor() {
+        const regNo = document.getElementById('subject-editor-student').value;
+        const student = masterStudentList.find(item => item.RegNo === regNo);
+        if (!student) return winAlert("Selection Required", "Load the directory and select a student first.");
+
+        const selectedSubjects = [...new Set(Array.from(document.querySelectorAll('.subject-editor-check:checked')).map(input => LAEC.normalizeSubjectValue(input.value)))];
+        if (selectedSubjects.length === 0) return winAlert("Selection Required", "Select at least one subject for this student.");
+
+        document.getElementById('loading-overlay').style.display = 'flex';
+        try {
+            const response = await fetch(AWS_CONFIG.registerEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: "UPDATE_STUDENT_SUBJECTS",
+                    schoolID: LOGGED_IN_SCHOOL_ID,
+                    regNo,
+                    subjects: selectedSubjects
+                })
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.status !== "success") throw new Error(result.message || result.error || "Subject update failed.");
+            student.Subjects = selectedSubjects;
+            loadStudentSubjectEditor();
+            renderTable(masterStudentList);
+            winAlert("Success", `${student.FullName}'s subjects have been updated.`);
+        } catch (error) {
+            winAlert("Update Failed", error.message || "Could not update this student's subjects.");
+        }
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+
+    async function getStudentsFromLambda(options = {}) {
+        const opts = typeof options === 'boolean' ? { returnOnly: options } : (options || {});
+        const classFilterEl = document.getElementById('dir-class-filter');
+        const classFilter = opts.classFilter || (classFilterEl ? classFilterEl.value : 'ALL');
+        const returnOnly = !!opts.returnOnly;
+        const silent = !!opts.silent;
+
+        if (!silent) document.getElementById('loading-overlay').style.display = 'flex';
+        try {
+            const baseUrl = AWS_CONFIG.getStudentsEndpoint.endsWith('/') ? AWS_CONFIG.getStudentsEndpoint : `${AWS_CONFIG.getStudentsEndpoint}/`;
+            const response = await fetch(`${baseUrl}?action=GET_STUDENTS&schoolID=${LOGGED_IN_SCHOOL_ID}`, { method: 'GET', mode: 'cors' });
+            const data = await response.json();
+            if (data.status === "success") {
+                masterStudentList = data.students || [];
+                populateDataLists(masterStudentList);
+                document.getElementById('count-total').innerText = masterStudentList.length;
+                const filtered = classFilter !== "ALL"
+                    ? masterStudentList.filter(student => student.Class === classFilter)
+                    : masterStudentList;
+                if (!returnOnly) renderTable(filtered);
+            } else if (!silent) {
+                winAlert('Sync Error', 'Student directory sync failed.');
+            }
+        } catch (e) {
+            if (!silent) winAlert('Sync Error', 'Query failed.');
+        }
+
+        if (!silent) document.getElementById('loading-overlay').style.display = 'none';
+        return masterStudentList;
+    }
+
+    async function loadSchoolStats() {
+        document.getElementById('loading-overlay').style.display = 'flex';
+        try {
+            const configResp = await fetch(`${AWS_CONFIG.registerEndpoint}?action=GET_CONFIG&schoolID=${LOGGED_IN_SCHOOL_ID}`, { method: 'GET', mode: 'cors' });
+            const configData = await configResp.json();
+            syncPromotionNotice(configData.promotionActive || false);
+
+            if (configData.academicYear) {
+                ACTIVE_SYNC_YEAR = configData.academicYear;
+                ACTIVE_OVERVIEW_YEAR = configData.academicYear;
+                document.getElementById('current-session-display').innerText = configData.academicYear;
+                syncOverviewYearFilter(configData.academicYear);
+            }
+            ACTIVE_SYNC_TERM = (configData.currentTerm || "TERM1").toUpperCase();
+            const invigilatorTermFilter = document.getElementById('invigilator-term-filter');
+            if (invigilatorTermFilter) invigilatorTermFilter.value = ACTIVE_SYNC_TERM;
+
+            const selectedYear = sessionFilterToAcademicYear(document.getElementById('pie-year-filter').value || ACTIVE_SYNC_YEAR);
+            ACTIVE_OVERVIEW_YEAR = selectedYear;
+
+            const [students, results] = await Promise.all([
+                getStudentsFromLambda({ returnOnly: true, silent: true }),
+                fetchSchoolResults(selectedYear)
+            ]);
+
+            masterResultList = results;
+            renderTable(students);
+            renderClassPopulationChart(students);
+            renderSubjectPerformanceChart(results);
+            populateDataLists(students);
+
+            const localMode = localStorage.getItem(`LAEC_LocalMode_${LOGGED_IN_SCHOOL_ID}`) || configData.mode || 'MODE_B';
+            updateLocalModeUI(localMode);
+            document.getElementById('current-mode-display').innerText = localMode === 'MODE_A' ? 'JOINT (Synced)' : 'INTERNAL (School)';
+            document.getElementById('global-mode-hint').innerText = localMode === 'MODE_A'
+                ? `Current Admin Category: ${configData.activeExamType || 'Not Set'}`
+                : "Internal School Control active.";
+            document.getElementById('global-exam-type').value = configData.activeExamType || '#';
+            syncResultFiltersWithConfig(configData);
+            handleCategoryChange();
+
+            if (configData.examDuration) {
+                const totalMinutes = parseInt(configData.examDuration, 10) || 0;
+                document.getElementById('timer-h').value = Math.floor(totalMinutes / 60);
+                document.getElementById('timer-m').value = totalMinutes % 60;
+                document.getElementById('timer-s').value = 0;
+            }
+
+            if (window.LAECExamSession) {
+                window.LAECExamSession.syncConfig('exam-session-root', configData);
+            }
+        } catch (e) {
+            console.error("Stats load failed", e);
+            renderClassPopulationChart([]);
+            renderSubjectPerformanceChart([]);
+        }
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+
+    function syncPromotionNotice(isPromotionActive) {
+        const alertBanner = document.getElementById('promotion-alert-banner');
+        const alertMsg = document.getElementById('promotion-alert-msg');
+        if (!alertBanner) return;
+
+        if (isPromotionActive) {
+            alertBanner.style.display = 'block';
+            if (alertMsg) {
+                alertMsg.innerText = "New Alert, click to view";
+            }
+            return;
+        }
+
+        alertBanner.style.display = 'none';
+        if (alertMsg) alertMsg.innerText = "";
+    }
+
+    function showPromotionNoticeDetails() {
+        winAlert(
+            "Class Promotion Notice",
+            "Fresh class promotion was recently done by the system's General Administrator, kindly remind the College Administrator to perform necessary demotion if need be."
+        );
+    }
+
+    function toggleNav() { document.getElementById('mainNav').classList.toggle('open'); }
+    function syncHeaderOffset() {
+        const header = document.querySelector('header');
+        if (!header) return;
+        document.documentElement.style.setProperty('--header-offset', `${header.offsetHeight + 28}px`);
+    }
+    function toggleBackToTopButton() {
+        const btn = document.getElementById('backToTopBtn');
+        if (!btn) return;
+        btn.classList.toggle('visible', window.scrollY > 320);
+    }
+    function scrollToTopPage() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function closeAlert() { document.getElementById('custom-alert').style.display = 'none'; document.getElementById('alert-photo-area').style.display = 'none'; }
+
+    function winAlert(title, msg, type = 'info', onConfirm = null, photoUrl = null) {
+        document.getElementById('alert-title').innerText = title;
+        document.getElementById('alert-msg').innerText = msg;
+        const modal = document.getElementById('custom-alert');
+        const okBtn = modal.querySelector('#alert-ok');
+        const cancelBtn = modal.querySelector('.btn-danger');
+        const confirmBtn = modal.querySelector('.btn-success');
+        const photoArea = document.getElementById('alert-photo-area');
+        const passportImg = document.getElementById('alert-passport');
+        
+        okBtn.style.display = 'block'; cancelBtn.style.display = 'none'; confirmBtn.style.display = 'none';
+        if(photoUrl) { photoArea.style.display = 'block'; passportImg.src = photoUrl; }
+        if(type === 'confirm') { okBtn.style.display = 'none'; cancelBtn.style.display = 'block'; confirmBtn.style.display = 'block'; confirmBtn.onclick = () => { closeAlert(); if(onConfirm) onConfirm(); }; }
+        modal.style.display = 'flex';
+    }
+
+    function viewStudentProfileByReg(reg) {
+        const student = masterStudentList.find(item => item.RegNo === reg);
+        if (!student) return winAlert("Not Found", "Load the directory and try again.");
+        const details = `NAME: ${student.FullName}\nREG ID: ${student.RegNo}\nACCESS PASS: ${student.Password || 'N/A'}\nCLASS: ${student.Class || 'N/A'}`;
+        winAlert("STUDENT PROFILE", details, 'info', null, student.PassportURL);
+    }
+
+    async function releaseAdminSession() {
+        return;
+    }
+
+    async function refreshAdminSessionLock() {
+        return;
+    }
+
+    function handleLogout() {
+        winAlert("SECURE LOGOUT", "End this admin session?", "confirm", async () => {
+            await releaseAdminSession();
+            localStorage.clear();
+            window.location.href = "/control/";
+        });
+    }
+
+    function refreshTabData(tabId) {
+        if (tabId === 'dashboard' || tabId === 'register') {
+            loadSchoolStats();
+            return;
+        }
+        if (tabId === 'students') {
+            getStudentsFromLambda();
+            return;
+        }
+        if (tabId === 'results') {
+            loadSchoolResults();
+            return;
+        }
+        if (tabId === 'exam-center') {
+            loadSchoolStats();
+            if (window.LAECExamSession) {
+                window.LAECExamSession.refresh('exam-session-root', true);
+            }
+            return;
+        }
+        if (tabId === 'past-questions') {
+            const subject = document.getElementById('pq-subject');
+            if (subject && subject.value !== '#') loadPastQuestions();
+            return;
+        }
+        if (tabId === 'health') {
+            checkHealth();
+            refreshInvigilatorFeed();
+        }
+    }
+
+    function showTab(tabId, el, options = {}) {
+        const targetPanel = document.getElementById(tabId);
+        if (!targetPanel) return;
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        targetPanel.classList.add('active');
+        if(el) el.classList.add('active');
+        localStorage.setItem('activeLAECSchoolTab', tabId); 
+        if (tabId !== 'register' && window.LAECRegistration) {
+            window.LAECRegistration.stopCamera();
+        }
+        if(window.innerWidth <= 900) document.getElementById('mainNav').classList.remove('open');
+        if (!options.skipRefresh) refreshTabData(tabId);
+    }
+
+    function restoreActiveTab() {
+        const fallbackTab = 'dashboard';
+        const savedTab = localStorage.getItem('activeLAECSchoolTab') || fallbackTab;
+        const targetTab = document.getElementById(`tab-${savedTab}`);
+        if (targetTab && document.getElementById(savedTab)) {
+            showTab(savedTab, targetTab, { skipRefresh: true });
+            return;
+        }
+        showTab(fallbackTab, document.getElementById(`tab-${fallbackTab}`), { skipRefresh: true });
+    }
+
+    function restoreCachedModeUI() {
+        const cachedMode = localStorage.getItem(`LAEC_LocalMode_${LOGGED_IN_SCHOOL_ID}`);
+        if (!cachedMode) return;
+        updateLocalModeUI(cachedMode);
+        document.getElementById('current-mode-display').innerText =
+            cachedMode === 'MODE_A' ? 'JOINT (Synced)' : 'INTERNAL (School)';
+    }
+
+    function syncResultFiltersWithConfig(config = {}) {
+        const setSelectValue = (id, value) => {
+            const element = document.getElementById(id);
+            const normalized = String(value || "").toUpperCase();
+            if (element && normalized && Array.from(element.options || []).some(option => option.value === normalized)) {
+                element.value = normalized;
+            }
+        };
+        const localMode = localStorage.getItem(`LAEC_LocalMode_${LOGGED_IN_SCHOOL_ID}`);
+        setSelectValue('res-year', config.academicYear);
+        setSelectValue('res-term', config.currentTerm || ACTIVE_SYNC_TERM);
+        setSelectValue('res-category', config.activeExamType);
+        setSelectValue('res-mode', config.currentMode || config.mode || localMode);
+        setSelectValue('script-year', config.academicYear);
+        setSelectValue('script-term', config.currentTerm || ACTIVE_SYNC_TERM);
+        setSelectValue('script-category', config.activeExamType);
+        setSelectValue('script-mode', config.currentMode || config.mode || localMode);
+    }
+
+    async function toggleLocalMode(mode) {
+        document.getElementById('loading-overlay').style.display = 'flex';
+        try {
+            const response = await fetch(AWS_CONFIG.registerEndpoint, {
+                method: 'POST', mode: 'cors', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'UPDATE_MODE', mode: mode, schoolID: LOGGED_IN_SCHOOL_ID })
+            });
+            if (response.ok) {
+                localStorage.setItem(`LAEC_LocalMode_${LOGGED_IN_SCHOOL_ID}`, mode);
+                updateLocalModeUI(mode);
+                loadSchoolStats(); 
+                winAlert("Local Override", `ICT System switched to ${mode === 'MODE_A' ? 'JOINT' : 'INTERNAL'} Mode.`);
+            }
+        } catch (e) { winAlert("Error", "Local mode switch failed."); }
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+
+    function updateLocalModeUI(mode) {
+        const btnA = document.getElementById('mode-a-btn'); 
+        const btnB = document.getElementById('mode-b-btn'); 
+        const hint = document.getElementById('local-mode-hint');
+        if(mode === 'MODE_A') { btnA.className = "mode-btn active-a"; btnB.className = "mode-btn"; hint.innerText = "Current: LOCAL JOINT MODE ACTIVE"; 
+        } else { btnB.className = "mode-btn active-b"; btnA.className = "mode-btn"; hint.innerText = "Current: LOCAL INTERNAL MODE ACTIVE"; }
+    }
+
+    let adminIdleTimer = null;
+    let adminSessionHeartbeat = null;
+    const ADMIN_IDLE_TIMEOUT_MS = 3 * 60 * 1000;
+
+    function startAdminIdleTracking() {
+        const resetIdleTimer = () => {
+            clearTimeout(adminIdleTimer);
+            adminIdleTimer = setTimeout(async () => {
+                await releaseAdminSession();
+                localStorage.clear();
+                window.location.replace("/control/");
+            }, ADMIN_IDLE_TIMEOUT_MS);
+        };
+
+        ["mousemove", "keydown", "click", "scroll", "touchstart"].forEach((eventName) => {
+            window.addEventListener(eventName, resetIdleTimer);
+        });
+        resetIdleTimer();
+        refreshAdminSessionLock();
+        clearInterval(adminSessionHeartbeat);
+        adminSessionHeartbeat = setInterval(refreshAdminSessionLock, 60 * 1000);
+    }
+
+    function getResultClassValue(result) {
+        return String(result.StudentClass || result.studentClass || result.Class || "").toUpperCase();
+    }
+
+    function slugifyExportToken(value, fallback = "ALL") {
+        const normalized = String(value || "").replace(/[^\w\s-]/g, " ").trim().replace(/\s+/g, "_");
+        return normalized || fallback;
+    }
+
+    function getSelectedText(id, fallback = "ALL") {
+        const element = document.getElementById(id);
+        if (!element) return fallback;
+        if (!element.options) {
+            const typedValue = element.value || fallback;
+            const option = Array.from(document.querySelectorAll(`#${id}-options option`))
+                .find(item => item.value === typedValue || item.textContent === typedValue);
+            return option ? (option.textContent || option.value) : typedValue;
+        }
+        return element.options[element.selectedIndex]?.text || element.value || fallback;
+    }
+
+    function normalizeResultSubjectInput() {
+        const element = document.getElementById('res-subject');
+        const rawValue = element ? String(element.value || 'ALL').trim() : 'ALL';
+        if (!rawValue || rawValue.toUpperCase() === 'ALL' || rawValue.toUpperCase() === 'ALL SUBJECTS') return 'ALL';
+        const option = Array.from(document.querySelectorAll('#res-subject-options option'))
+            .find(item => item.value.toUpperCase() === rawValue.toUpperCase() || item.textContent.toUpperCase() === rawValue.toUpperCase());
+        if (option) return option.value.toUpperCase();
+        return LAEC && typeof LAEC.normalizeSubjectValue === 'function'
+            ? LAEC.normalizeSubjectValue(rawValue)
+            : rawValue.toUpperCase().replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    function applyCurrentResultFilters(results = masterResultList) {
+        const query = (document.getElementById('res-reg-filter').value || '').toLowerCase();
+        const classFilter = document.getElementById('res-class').value;
+        return results.filter((result) => {
+            const regNo = (result.RegNo || '').toLowerCase();
+            const name = (result.FullName || '').toLowerCase();
+            const resultClass = getResultClassValue(result);
+            const matchesQuery = !query || regNo.includes(query) || name.includes(query);
+            const matchesClass = classFilter === 'ALL' || resultClass === classFilter;
+            return matchesQuery && matchesClass;
+        });
+    }
+
+    function buildExportFilename(tableID, fallbackName) {
+        if (tableID === 'resultsTable') {
+            const subjectToken = normalizeResultSubjectInput() === 'ALL' ? 'All_Subjects' : slugifyExportToken(getSelectedText('res-subject'));
+            const classToken = document.getElementById('res-class').value === 'ALL' ? 'All_Classes' : slugifyExportToken(document.getElementById('res-class').value);
+            return `${subjectToken}_Result_${classToken}`;
+        }
+
+        if (tableID === 'pqTable') {
+            const subjectToken = slugifyExportToken(getSelectedText('pq-subject'), 'Questions');
+            const classToken = slugifyExportToken(getSelectedText('pq-class'), 'All_Classes');
+            const typeToken = slugifyExportToken(getSelectedText('pq-type'), 'All_Types');
+            return `${subjectToken}_Questions_${classToken}_${typeToken}`;
+        }
+
+        return fallbackName;
+    }
+
+    function handleCategoryChange() {
+        const cat = document.getElementById('global-exam-type').value;
+        const hIn = document.getElementById('timer-h'); const mIn = document.getElementById('timer-m'); const sIn = document.getElementById('timer-s');
+        if (cat === "#") { hIn.value = 0; mIn.value = 0; sIn.value = 0; hIn.disabled = true; mIn.disabled = true; sIn.disabled = true;
+        } else { hIn.disabled = false; mIn.disabled = false; sIn.disabled = false; }
+    }
+
+    async function uploadQuestionImage() {
+        const fileInput = document.getElementById('img-hosting'); const file = fileInput.files[0];
+        const resArea = document.getElementById('hosting-result-area'); const urlField = document.getElementById('generated-url-field');
+        if (!file) return winAlert("No File", "Select a diagram image first.");
+        document.getElementById('loading-overlay').style.display = 'flex';
+        const reader = new FileReader(); reader.readAsDataURL(file);
+        reader.onload = async () => {
+            const base64Data = reader.result.split(',')[1];
+            try {
+                const response = await fetch(AWS_CONFIG.registerEndpoint, {
+                    method: 'POST', mode: 'cors', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "UPLOAD_QUESTION_IMAGE", fileName: file.name, fileType: file.type, imageBase64: base64Data })
+                });
+                const data = await response.json();
+                document.getElementById('loading-overlay').style.display = 'none';
+                if (data.status === "success") { resArea.classList.remove('hidden'); urlField.value = data.imageUrl; winAlert("Cloud Link Generated", "Copy the URL below.");
+                } else { winAlert("Upload Denied", data.message || "Could not store image."); }
+            } catch (e) { document.getElementById('loading-overlay').style.display = 'none'; winAlert("Sync Error", "Failed to connect."); }
+        };
+    }
+
+    function copyDiagramURL() {
+        const field = document.getElementById('generated-url-field'); field.select(); navigator.clipboard.writeText(field.value); winAlert("Copied", "Link copied!");
+    }
+
+    async function handleBulkBlast() {
+        const fileInput = document.getElementById('excel-blast');
+        const sessionType = document.getElementById('blast-session').value;
+        const bh = parseInt(document.getElementById('blast-h').value) || 0;
+        const bm = parseInt(document.getElementById('blast-m').value) || 0;
+        const bs = parseInt(document.getElementById('blast-s').value) || 0;
+        const instructionInput = document.getElementById('blast-instruction');
+        const assessmentInstruction = instructionInput ? instructionInput.value.trim() : "";
+        const totalMinutes = (bh * 60) + bm + (bs / 60);
+
+        if (sessionType === "#") return winAlert("Required", "Please select Target Category.");
+        if (totalMinutes <= 0) return winAlert("Required", "Please set an Exam Duration for students.");
+        if (!fileInput.files[0]) return winAlert("File Missing", "Select your Excel file.");
+        
+        document.getElementById('loading-overlay').style.display = 'flex';
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array', cellHTML: true, cellStyles: true, bookFiles: true });
+                const json = LAEC.extractFormattedQuestionRows(workbook);
+                const normalizedQuestions = LAEC.normalizeQuestionRows(json);
+                const synchronizedQuestions = normalizedQuestions.map(q => ({ ...q, Term: ACTIVE_SYNC_TERM }));
+                if (json.length > 0 && !json[0].hasOwnProperty('Class')) { throw new Error("Column 'Class' missing in Excel."); }
+                if (normalizedQuestions.length === 0) { throw new Error("No valid question rows were found after normalization."); }
+
+                const response = await fetch(AWS_CONFIG.registerEndpoint, {
+                    method: 'POST', mode: 'cors', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: "BULK_UPLOAD_QUESTIONS", schoolID: LOGGED_IN_SCHOOL_ID, testType: sessionType, 
+                        questions: synchronizedQuestions, durationMinutes: totalMinutes, assessmentInstruction
+                    })
+                });
+                const result = await response.json();
+                document.getElementById('loading-overlay').style.display = 'none';
+                if (result.status === "success") {
+                    winAlert("Blast Complete", "Paper normalized successfully. Use the session settings card to choose which papers go live.");
+                    fileInput.value = "";
+                    document.getElementById('blast-h').value = ""; document.getElementById('blast-m').value = ""; document.getElementById('blast-s').value = "";
+                    if (instructionInput) instructionInput.value = "";
+                    if (window.LAECExamSession) {
+                        window.LAECExamSession.refresh('exam-session-root', true);
+                    }
+                } else { throw new Error(result.message); }
+            } catch (err) { document.getElementById('loading-overlay').style.display = 'none'; winAlert("Failure", err.message); }
+        };
+        reader.readAsArrayBuffer(fileInput.files[0]);
+    }
+
+    function renderTable(list) {
+        const tbody = document.getElementById('student-table-body');
+        tbody.innerHTML = list.map((s, index) => {
+            const joinedDate = s.CreatedAt ? new Date(s.CreatedAt).toLocaleDateString() : 'N/A';
+            return `<tr>
+                <td>${index+1}</td>
+                <td><img src="${s.PassportURL || '/nicegene_logo.png'}" class="photo-circle"></td>
+                <td><b>${s.FullName}</b></td>
+                <td style="color:var(--laec-blue); font-weight:bold">${s.RegNo}</td>
+                <td>${s.Class}</td>
+                <td><span style="color:#666; font-weight:bold">${joinedDate}</span></td>
+                <td><button onclick="viewStudentProfileByReg('${escapeAttr(s.RegNo)}')" style="background:#f0f0f0; border:1px solid #ccc; font-size:9px; padding:4px 8px; border-radius:4px; cursor:pointer;">VIEW</button></td>
+                <td><button onclick="confirmDeleteStudent('${escapeAttr(s.RegNo)}')" style="background:var(--danger); color:white; border:none; font-size:9px; padding:4px 8px; border-radius:4px; cursor:pointer;">DELETE</button></td>
+                <td><button onclick="printStudentSlip('${escapeAttr(s.RegNo)}')" style="background:#f0f0f0; border:1px solid #ccc; font-size:9px; padding:4px 8px; border-radius:4px; cursor:pointer;">PRINT</button></td>
+            </tr>`;
+        }).join('') || `<tr><td colspan="9" style="text-align:center; color:#999;">No student records found.</td></tr>`;
+    }
+
+    async function confirmDeleteStudent(regNo) {
+        winAlert("CONFIRM DELETE", `Are you sure you want to permanently delete student ${regNo}? This action cannot be undone.`, "confirm", async () => {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            try {
+                const response = await fetch(AWS_CONFIG.registerEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "DELETE_STUDENT", schoolID: LOGGED_IN_SCHOOL_ID, regNo: regNo })
+                });
+                if (!response.ok) throw new Error();
+                winAlert("Success", "Student records removed.");
+                getStudentsFromLambda();
+            } catch (e) {
+                winAlert("Error", "Could not delete student.");
+            }
+            document.getElementById('loading-overlay').style.display = 'none';
+        });
+    }
+
+    function printStudentSlip(regNo) {
+        const student = masterStudentList.find(item => item.RegNo === regNo);
+        if (!student) return winAlert("Not Found", "Load the directory and try again.");
+        const subjects = (student.Subjects || []).map(subject => LAEC.humanizeSubject(subject)).join(', ') || 'No subjects assigned';
+        const printWindow = window.open('', '_blank', 'width=720,height=900');
+        if (!printWindow) return winAlert("Print Blocked", "Allow popups for this portal, then try printing again.");
+        printWindow.document.write(`<!DOCTYPE html><html><head><title>${escapeAttr(student.FullName)} Slip</title><style>
+            body{font-family:Arial,sans-serif;color:#111;padding:24px;} .slip{border:2px solid #111;padding:20px;max-width:680px;margin:0 auto;}
+            .head{text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:16px;} .body{display:flex;gap:18px;align-items:flex-start;}
+            img{width:130px;height:130px;object-fit:cover;border:1px solid #111;} p{margin:0 0 8px;font-size:14px;line-height:1.45;}
+            .subjects{border-top:1px dashed #555;margin-top:16px;padding-top:12px;font-size:13px;line-height:1.6;} @media print{body{padding:0}.slip{border:2px solid #111;}}
+        <\/style><\/head><body><div class="slip">
+            <div class="head"><h2 style="margin:0;">LAEC STUDENT EXAMINATION SLIP</h2><p style="margin:6px 0 0;">${escapeAttr(SCHOOL_NAMES[LOGGED_IN_SCHOOL_ID] || LOGGED_IN_SCHOOL_ID)}</p></div>
+            <div class="body"><img src="${escapeAttr(student.PassportURL || '/nicegene_logo.png')}"><div>
+                <p><strong>NAME:</strong> ${escapeAttr(student.FullName)}</p><p><strong>REG NO:</strong> ${escapeAttr(student.RegNo)}</p>
+                <p><strong>CLASS:</strong> ${escapeAttr(student.Class || 'N/A')}</p>
+                <p><strong>PASSWORD:</strong> ${escapeAttr(student.Password || 'PROTECTED')}</p></div></div>
+            <div class="subjects"><strong>REGISTERED SUBJECTS:</strong><br>${escapeAttr(subjects)}</div>
+        </div><\/body><\/html>`);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 250);
+    }
+
+    async function downloadStudentCredentialPdf() {
+        const classFilterEl = document.getElementById('dir-class-filter');
+        const classFilter = classFilterEl ? classFilterEl.value : 'ALL';
+        if (!masterStudentList || masterStudentList.length === 0) await getStudentsFromLambda({ silent: true });
+
+        const students = (masterStudentList || [])
+            .filter(student => classFilter === 'ALL' || student.Class === classFilter)
+            .sort((a, b) => String(a.FullName || '').localeCompare(String(b.FullName || '')));
+
+        if (!students.length) return winAlert("No Data", "No students found for the selected class.");
+
+        const classLabel = classFilter === 'ALL' ? 'All Classes' : classFilter;
+        const schoolName = SCHOOL_NAMES[LOGGED_IN_SCHOOL_ID] || LOGGED_IN_SCHOOL_ID;
+        const pdf = window.jspdf && window.jspdf.jsPDF;
+        if (pdf) {
+            const doc = new pdf({ unit: 'pt', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 44;
+            const slipHeight = 110;
+            const gap = 16;
+            let y = margin;
+
+            const drawHeader = () => {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(14);
+                doc.text('LAEC STUDENT LOGIN CREDENTIALS', pageWidth / 2, y, { align: 'center' });
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                doc.text(String(schoolName), pageWidth / 2, y + 16, { align: 'center' });
+                doc.text(`${classLabel} - ${students.length} student(s)`, pageWidth / 2, y + 30, { align: 'center' });
+                y += 52;
+            };
+
+            drawHeader();
+            students.forEach((student, index) => {
+                if (y + slipHeight > pageHeight - margin) {
+                    doc.addPage();
+                    y = margin;
+                    drawHeader();
+                }
+
+                if (doc.setLineDashPattern) doc.setLineDashPattern([4, 3], 0);
+                doc.rect(margin, y, pageWidth - (margin * 2), slipHeight);
+                if (doc.setLineDashPattern) doc.setLineDashPattern([], 0);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(11);
+                doc.text(String(index + 1), pageWidth - margin - 18, y + 20);
+                doc.text(String(student.FullName || 'N/A').toUpperCase(), margin + 16, y + 30);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(11);
+                doc.text(`User ID: ${student.RegNo || 'N/A'}`, margin + 16, y + 58);
+                doc.text(`Password: ${student.Password || 'PROTECTED'}`, margin + 16, y + 80);
+                y += slipHeight + gap;
+            });
+
+            doc.save(`Student_Credentials_${LOGGED_IN_SCHOOL_ID}_${classFilter}.pdf`);
+            return;
+        }
+
+        const slips = students.map((student, index) => `
+            <section class="credential-slip">
+                <div class="serial">${index + 1}</div>
+                <h2>${escapeAttr(student.FullName || 'N/A')}</h2>
+                <p><strong>User ID:</strong> ${escapeAttr(student.RegNo || 'N/A')}</p>
+                <p><strong>Password:</strong> ${escapeAttr(student.Password || 'PROTECTED')}</p>
+            </section>
+        `).join('');
+
+        const printWindow = window.open('', '_blank', 'width=820,height=900');
+        if (!printWindow) return winAlert("PDF Blocked", "Allow popups for this portal, then try again.");
+        printWindow.document.write(`<!DOCTYPE html><html><head><title>${escapeAttr(classLabel)} Student Credentials</title><style>
+            body{font-family:Arial,sans-serif;color:#111;margin:0;padding:22px;background:#fff;}
+            header{text-align:center;margin-bottom:18px;border-bottom:2px solid #111;padding-bottom:10px;}
+            h1{font-size:18px;margin:0 0 4px;} header p{margin:2px 0;font-size:12px;}
+            .credential-slip{position:relative;border:1.5px dashed #111;padding:18px 18px 16px;margin:0 0 14px;page-break-inside:avoid;break-inside:avoid;}
+            .serial{position:absolute;top:10px;right:12px;font-size:11px;font-weight:bold;color:#555;}
+            h2{font-size:16px;margin:0 42px 12px 0;text-transform:uppercase;}
+            p{font-size:14px;margin:8px 0;line-height:1.45;}
+            @media print{body{padding:12mm}.credential-slip{margin-bottom:10mm;}}
+        <\/style><\/head><body>
+            <header><h1>LAEC STUDENT LOGIN CREDENTIALS</h1><p>${escapeAttr(schoolName)}</p><p>${escapeAttr(classLabel)} - ${students.length} student(s)</p></header>
+            ${slips}
+        <\/body><\/html>`);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 300);
+    }
+
+    function exportStudentData() {
+        if (!masterStudentList || masterStudentList.length === 0) return winAlert("No Data", "Load the directory first.");
+        const exportData = masterStudentList.map(s => ({
+            "Full Name": s.FullName,
+            "Registration ID": s.RegNo,
+            "Password": s.Password || "N/A",
+            "Passport URL": s.PassportURL || "",
+            "Class": s.Class,
+            "School": LOGGED_IN_SCHOOL_ID,
+            "Joined Date": s.CreatedAt ? new Date(s.CreatedAt).toLocaleDateString() : 'N/A'
+        }));
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Portal_Population");
+        XLSX.writeFile(wb, `Student_Portal_Data_${LOGGED_IN_SCHOOL_ID}.xlsx`);
+    }
+
+    async function loadSchoolResults() {
+        document.getElementById('loading-overlay').style.display = 'flex';
+        const year = document.getElementById('res-year').value; const term = document.getElementById('res-term').value;
+        const category = document.getElementById('res-category').value; const mode = document.getElementById('res-mode').value;
+        const subject = normalizeResultSubjectInput();
+        try {
+            const baseUrl = AWS_CONFIG.getStudentsEndpoint.endsWith('/') ? AWS_CONFIG.getStudentsEndpoint : AWS_CONFIG.getStudentsEndpoint + '/';
+            const url = `${baseUrl}?action=GET_RESULTS&schoolID=${LOGGED_IN_SCHOOL_ID}&year=${year}&term=${term}&category=${category}&mode=${mode}&subject=${subject}`;
+            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            const data = await response.json();
+            if (data.status === "success") { masterResultList = data.results || []; populateResultRegistrationList(masterResultList); renderResultsTable(applyCurrentResultFilters(masterResultList)); }
+        } catch (e) { winAlert("Sync Error", "Fetch failed."); }
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+
+    function scrollResultsTable(direction) {
+        const table = document.getElementById('resultsTable');
+        const container = table ? table.closest('.table-responsive') : null;
+        if (!container) return;
+        container.scrollBy({ left: direction * Math.max(260, container.clientWidth * 0.75), behavior: 'smooth' });
+    }
+
+    function getResultAnswerScript(result) {
+        if (Array.isArray(result.AnswerScript)) return result.AnswerScript;
+        if (Array.isArray(result.answerScript)) return result.answerScript;
+        if (Array.isArray(result.Script)) return result.Script;
+        if (typeof result.AnswerScript === "string" && result.AnswerScript.trim()) {
+            try { const parsed = JSON.parse(result.AnswerScript); return Array.isArray(parsed) ? parsed : []; } catch (e) { return []; }
+        }
+        return [];
+    }
+
+    function stripResultHtml(value) {
+        return String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    }
+
+    function escapeResultScriptHtml(value) {
+        return String(value || "").replace(/[&<>"']/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
+
+    function formatResultAnswer(item, value) {
+        const raw = String(value || "").trim();
+        if (!raw) return "Blank";
+        const letter = raw.toUpperCase();
+        if (/^[A-D]$/.test(letter)) {
+            const optionText = stripResultHtml(item[`${letter}HTML`] || item[letter] || "");
+            return optionText ? `${optionText} (${letter})` : letter;
+        }
+        return raw;
+    }
+
+    function getResultScriptPrintHtml(title, rowsHtml) {
+        return `<!DOCTYPE html><html><head><title>${escapeResultScriptHtml(title)}</title><style>
+            body{font-family:Arial,sans-serif;color:#17233f;padding:24px;line-height:1.45;}
+            h1{font-size:20px;margin:0 0 14px;color:#0f3766;}
+            .script-row{border:1px solid #d9e2ef;border-radius:8px;padding:14px;margin-bottom:12px;page-break-inside:avoid;}
+            .question{font-weight:700;margin-bottom:8px;}
+            .meta{font-size:13px;margin:4px 0;}
+            @media print{body{padding:12mm}.script-row{break-inside:avoid;}}
+        <\/style><\/head><body><h1>${escapeResultScriptHtml(title)}</h1>${rowsHtml}<\/body><\/html>`;
+    }
+
+    function printResultScript(title, rowsHtml) {
+        const printWindow = window.open('', '_blank', 'width=920,height=900');
+        if (!printWindow) return winAlert("Print Blocked", "Allow popups for this portal, then try again.");
+        printWindow.document.write(getResultScriptPrintHtml(title, rowsHtml));
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 300);
+    }
+
+    function closeResultScriptModal() {
+        const modal = document.getElementById('result-script-modal');
+        if (modal) modal.remove();
+    }
+
+    function showResultScriptModal(title, rowsHtml) {
+        closeResultScriptModal();
+        const modal = document.createElement('div');
+        modal.id = 'result-script-modal';
+        modal.style.cssText = 'position:fixed; inset:0; background:rgba(5,16,32,.62); z-index:99999; display:flex; align-items:center; justify-content:center; padding:18px;';
+        modal.innerHTML = `
+            <div style="width:min(920px,96vw); max-height:92vh; background:#fff; border-radius:12px; box-shadow:0 24px 70px rgba(0,0,0,.35); display:flex; flex-direction:column; overflow:hidden;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 18px; border-bottom:1px solid #e5edf6;">
+                    <h3 style="margin:0; color:#0f3766; font-size:18px;">${escapeResultScriptHtml(title)}</h3>
+                    <button type="button" onclick="closeResultScriptModal()" style="border:0; background:#eef3f8; color:#123; width:34px; height:34px; border-radius:50%; font-weight:900; cursor:pointer;">X</button>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px; padding:12px 18px; border-bottom:1px solid #edf2f7;">
+                    <button type="button" data-role="print-result-script" style="background:#0f3766; color:#fff; border:0; border-radius:8px; padding:10px 14px; font-weight:800; cursor:pointer;">PRINT / SAVE PDF</button>
+                </div>
+                <div id="result-script-print-body" style="padding:18px; overflow:auto; max-height:68vh;">${rowsHtml}</div>
+            </div>`;
+        document.body.appendChild(modal);
+        const printBtn = modal.querySelector('[data-role="print-result-script"]');
+        if (printBtn) printBtn.onclick = () => printResultScript(title, document.getElementById('result-script-print-body').innerHTML);
+    }
+
+    async function refreshResultScriptFromCloud(result, index, targetList = renderedResultList) {
+        if (getResultAnswerScript(result).length > 0) return result;
+        const regNo = result.RegNo || result.regNo || "";
+        const subject = result.Subject || result.subject || "";
+        if (!regNo || !subject) return result;
+        const baseUrl = AWS_CONFIG.getStudentsEndpoint.endsWith('/') ? AWS_CONFIG.getStudentsEndpoint : AWS_CONFIG.getStudentsEndpoint + '/';
+        const schoolID = result.SchoolID || (typeof LOGGED_IN_SCHOOL_ID !== "undefined" ? LOGGED_IN_SCHOOL_ID : "ALL");
+        const params = new URLSearchParams({
+            action: "GET_RESULTS",
+            schoolID,
+            targetSchool: schoolID,
+            regNo,
+            subject,
+            year: result.YearKey || String(result.AcademicYear || document.getElementById('res-year')?.value || "2025-2026").replace('/', '-'),
+            term: result.Term || document.getElementById('res-term')?.value || "TERM1",
+            category: result.Category || document.getElementById('res-category')?.value || "EXAM",
+            mode: result.Mode || document.getElementById('res-mode')?.value || "MODE_A",
+            noCache: "1"
+        });
+        try {
+            const response = await fetch(`${baseUrl}?${params.toString()}`, { method: 'GET', mode: 'cors' });
+            const data = await response.json();
+            const fresh = data.status === "success" && Array.isArray(data.results) ? data.results[0] : null;
+            if (!fresh) return result;
+            const merged = { ...result, ...fresh };
+            if (Array.isArray(targetList)) targetList[index] = merged;
+            const masterIndex = masterResultList.findIndex((item) => (item.PK && item.SK && item.PK === merged.PK && item.SK === merged.SK) || (item.RegNo === merged.RegNo && item.Subject === merged.Subject));
+            if (masterIndex >= 0) masterResultList[masterIndex] = { ...masterResultList[masterIndex], ...merged };
+            return merged;
+        } catch (error) {
+            return result;
+        }
+    }
+
+    async function viewResultScript(index, scope, source = "results") {
+        const sourceList = source === "script" ? renderedScriptResultList : renderedResultList;
+        let result = sourceList[index];
+        if (!result) return winAlert("Missing Result", "Load the result again and retry.");
+        result = await refreshResultScriptFromCloud(result, index, sourceList);
+        sourceList[index] = result;
+        const script = getResultAnswerScript(result);
+        if (script.length === 0) return winAlert("Script Unavailable", "This result does not have a stored answer script. Newly submitted results will include script details.");
+        const rows = script.filter((item) => scope === "passed" ? item.IsCorrect : !item.IsCorrect && String(item.QuestionType || "").toUpperCase() !== "THEORY");
+        if (rows.length === 0) return winAlert("No Script Rows", `No ${scope === "passed" ? "passed" : "failed"} objective questions were found for this result.`);
+        const title = `${scope === "passed" ? "Passed" : "Failed"} Script - ${result.FullName || result.RegNo}`;
+        const rowsHtml = rows.map((item, rowIndex) => {
+            const question = stripResultHtml(item.QuestionHTML || item.Question || item.TextHTML || item.Text);
+            const studentAnswer = formatResultAnswer(item, item.StudentAnswer);
+            const correctAnswer = formatResultAnswer(item, item.CorrectAnswer || item.Correct);
+            return `<div class="script-row" style="border:1px solid #d9e2ef; border-radius:8px; padding:14px; margin-bottom:12px;">
+                <div class="question" style="font-weight:800; margin-bottom:8px;">${rowIndex + 1}. Q${escapeResultScriptHtml(item.QuestionNo || rowIndex + 1)}: ${escapeResultScriptHtml(question)}</div>
+                <div class="meta" style="margin:4px 0;"><strong>Student Answer:</strong> ${escapeResultScriptHtml(studentAnswer)}</div>
+                <div class="meta" style="margin:4px 0;"><strong>Correct Answer:</strong> ${escapeResultScriptHtml(correctAnswer)}</div>
+                <div class="meta" style="margin:4px 0;"><strong>Mark:</strong> ${escapeResultScriptHtml(item.Awarded || 0)}/${escapeResultScriptHtml(item.Mark || 0)}</div>
+            </div>`;
+        }).join("");
+        showResultScriptModal(title, rowsHtml);
+    }
+
+    async function remarkLoadedResults() {
+        const list = applyCurrentResultFilters(masterResultList);
+        const records = list.filter((item) => item.PK && item.SK).map((item) => ({ pk: item.PK, sk: item.SK }));
+        if (records.length === 0) return winAlert("No Results", "Load results with database keys before remarking.");
+        winAlert("REMARK RESULTS", `Remark ${records.length} loaded result(s) from the stored student scripts?`, "confirm", async () => {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            try {
+                const response = await fetch(AWS_CONFIG.registerEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "REMARK_STUDENT_RESULTS", records })
+                });
+                const data = await response.json();
+                if (!response.ok || data.status !== "success") throw new Error(data.message || "Remark failed.");
+                winAlert("Remark Complete", data.message || "Results remarked successfully.");
+                loadSchoolResults();
+            } catch (e) {
+                winAlert("Remark Error", e.message || "Could not remark results.");
+            }
+            document.getElementById('loading-overlay').style.display = 'none';
+        });
+    }
+
+    async function deleteSelectedSubjectResults() {
+        const subject = normalizeResultSubjectInput();
+        if (!subject || subject === "ALL") return winAlert("Select Subject", "Choose one subject before deleting subject results.");
+        const list = applyCurrentResultFilters(masterResultList).filter((item) => String(item.Subject || "").toUpperCase() === subject);
+        const records = list.filter((item) => item.PK && item.SK).map((item) => ({ pk: item.PK, sk: item.SK, subject: item.Subject }));
+        if (records.length === 0) return winAlert("No Results", "No loaded result records match the selected subject.");
+        winAlert("DELETE SUBJECT RESULTS", `Delete ${records.length} loaded ${subject} result record(s)? This cannot be undone.`, "confirm", async () => {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            try {
+                const response = await fetch(AWS_CONFIG.registerEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "DELETE_SUBJECT_RESULTS", subject, records })
+                });
+                const data = await response.json();
+                if (!response.ok || data.status !== "success") throw new Error(data.message || "Delete failed.");
+                winAlert("Deleted", data.message || "Subject results deleted.");
+                loadSchoolResults();
+            } catch (e) {
+                winAlert("Delete Error", e.message || "Could not delete subject results.");
+            }
+            document.getElementById('loading-overlay').style.display = 'none';
+        });
+    }
+
+    function renderResultsTable(list) {
+        const thead = document.getElementById('results-thead'); const tbody = document.getElementById('results-table-body');
+        renderedResultList = list || [];
+        thead.innerHTML = `<tr><th>S/N</th><th>Student Name</th><th>Reg No</th><th>Class</th><th>Subject</th><th>Score</th><th>Status</th></tr>`;
+        tbody.innerHTML = renderedResultList.length ? renderedResultList.map((r, index) => `
+            <tr><td>${index + 1}</td><td><b>${r.FullName}</b></td><td>${r.RegNo}</td><td>${getResultClassValue(r) || 'N/A'}</td><td>${r.Subject}</td><td style="font-weight:bold">${formatResultScore(r)}</td><td>${formatResultStatusAction(r)}</td></tr>`).join('') : `<tr><td colspan="7" style="text-align:center; color:#999">No data found</td></tr>`;
+    }
+
+    function localResultSearch() { renderResultsTable(applyCurrentResultFilters(masterResultList)); }
+
+    function confirmDeleteResult(pk, sk) {
+        if (!pk || !sk) return winAlert("Missing Record", "This result record cannot be deleted because its database key is missing.");
+        winAlert("CONFIRM DELETION", "Are you sure? This will remove the result and allow the student to re-sit the exam.", "confirm", async () => {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            try {
+                const response = await fetch(AWS_CONFIG.registerEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "DELETE_STUDENT_RESULT", pk: pk, sk: sk })
+                });
+                if (response.ok) {
+                    winAlert("Success", "Result deleted. Student can now re-write.");
+                    loadSchoolResults();
+                } else { throw new Error(); }
+            } catch (e) { winAlert("Error", "Could not delete result."); }
+            document.getElementById('loading-overlay').style.display = 'none';
+        });
+    }
+
+    async function loadPastQuestions() {
+        const mode = document.getElementById('pq-mode').value; const subject = document.getElementById('pq-subject').value;
+        const term = document.getElementById('pq-term').value; const type = document.getElementById('pq-type').value;
+        const rawYear = document.getElementById('pq-year').value; const studentClass = document.getElementById('pq-class').value;
+        const tbody = document.getElementById('pq-table-body');
+        if(subject === "#") return winAlert("Selection Required", "Please select a Subject.");
+        document.getElementById('loading-overlay').style.display = 'flex';
+        const yearInt = rawYear.replace('/', '-');
+        try {
+            const targetSchool = (mode === "MODE_A") ? "GLOBAL" : LOGGED_IN_SCHOOL_ID;
+            const { data } = await LAEC.fetchQuestionSet({
+                baseUrl: AWS_CONFIG.getStudentsEndpoint,
+                params: {
+                    action: "GET_SECURE_QUESTIONS",
+                    schoolID: targetSchool,
+                    year: yearInt,
+                    term,
+                    class: LAEC.normalizeClassValue(studentClass),
+                    subject,
+                    type,
+                    mode,
+                    pastOnly: "1"
+                }
+            });
+            if (data.status === "success" && data.questions) {
+                if (data.questions.length > 0) {
+                    tbody.innerHTML = data.questions.map((q, i) => `<tr><td>${i + 1}</td><td>${LAEC.humanizeSubject(q.Subject)}</td><td>${q.Class}</td><td>${type}</td><td style="font-size: 11px;">${q.Question || q.Text}</td></tr>`).join('');
+                    winAlert("Sync Success", `Retrieved ${data.questions.length} questions.`);
+                } else { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#999;">No questions found.</td></tr>'; }
+            }
+        } catch (e) { winAlert("Sync Error", "Failed."); }
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+
+    const INVIGILATOR_CATEGORIES = ['CA1', 'CA2', 'EXAM'];
+
+    function dedupeInvigilatorResults(results) {
+        const seen = new Set();
+        return results.filter((item) => {
+            const key = [item.PK, item.SK, item.RegNo, item.Subject, item.Timestamp].filter(Boolean).join('|');
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
+
+    function normalizeInvigilatorSubjectInput() {
+        const element = document.getElementById('invigilator-subject-filter');
+        const rawValue = element ? String(element.value || 'ALL').trim() : 'ALL';
+        if (!rawValue || rawValue.toUpperCase() === 'ALL' || rawValue.toUpperCase() === 'ALL SUBJECTS') return 'ALL';
+        const option = Array.from(document.querySelectorAll('#res-subject-options option'))
+            .find(item => item.value.toUpperCase() === rawValue.toUpperCase() || item.textContent.toUpperCase() === rawValue.toUpperCase());
+        if (option) return option.value.toUpperCase();
+        return LAEC && typeof LAEC.normalizeSubjectValue === 'function'
+            ? LAEC.normalizeSubjectValue(rawValue)
+            : rawValue.toUpperCase().replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    function getInvigilatorClassFilter() {
+        const element = document.getElementById('invigilator-class-filter');
+        return element ? String(element.value || 'ALL').toUpperCase() : 'ALL';
+    }
+
+    function renderInvigilatorRows(results) {
+        const tbody = document.getElementById('invigilator-feed-body');
+        if (results.length > 0) {
+            tbody.innerHTML = results.map((result) => `
+                <tr>
+                    <td>${result.Timestamp ? new Date(result.Timestamp).toLocaleString() : '---'}</td>
+                    <td><b>${result.FullName || 'UNKNOWN'}</b><br><span style="font-size:0.72rem; color:#777;">${result.RegNo || ''}</span></td>
+                    <td>${result.SchoolID || 'N/A'}</td>
+                    <td>${getResultClassValue(result) || 'N/A'}</td>
+                    <td>${LAEC.humanizeSubject(result.Subject || '')}</td>
+                    <td>${result.Category || 'N/A'} (${result.Mode || 'N/A'})</td>
+                    <td style="color:var(--danger); font-weight:bold;">${result.Violation || 'Tab Switch/Focus Lost'}</td>
+                </tr>`).join('');
+        } else {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--success); font-weight:bold;">No security violations detected for the selected filters.</td></tr>`;
+        }
+    }
+
+    async function fetchInvigilatorResultsFor({ category, mode, year, term, subject, studentClass }) {
+        const baseUrl = AWS_CONFIG.getStudentsEndpoint.endsWith('/') ? AWS_CONFIG.getStudentsEndpoint : `${AWS_CONFIG.getStudentsEndpoint}/`;
+        const params = new URLSearchParams({
+            action: 'GET_RESULTS',
+            schoolID: LOGGED_IN_SCHOOL_ID,
+            category,
+            mode,
+            year,
+            term,
+            subject: subject || 'ALL',
+            class: studentClass || 'ALL'
+        });
+        const response = await fetch(`${baseUrl}?${params.toString()}`, { method: 'GET', mode: 'cors' });
+        const data = await response.json();
+        return data.status === 'success' ? (data.results || []) : [];
+    }
+
+    async function refreshInvigilatorFeed() {
+        const tbody = document.getElementById('invigilator-feed-body');
+        const modeFilter = document.getElementById('invigilator-mode-filter').value;
+        const yearFilter = document.getElementById('invigilator-year-filter').value || ACTIVE_SYNC_YEAR;
+        const termFilter = document.getElementById('invigilator-term-filter').value || ACTIVE_SYNC_TERM;
+        const classFilter = getInvigilatorClassFilter();
+        const subjectFilter = normalizeInvigilatorSubjectInput();
+        const modes = modeFilter === 'ALL' ? ['MODE_A', 'MODE_B'] : [modeFilter];
+
+        document.getElementById('loading-overlay').style.display = 'flex';
+
+        try {
+            const batches = await Promise.all(
+                modes.flatMap((mode) =>
+                    INVIGILATOR_CATEGORIES.map((category) => fetchInvigilatorResultsFor({ category, mode, year: yearFilter, term: termFilter, subject: subjectFilter, studentClass: classFilter }))
+                )
+            );
+            const flaggedResults = dedupeInvigilatorResults(batches.flat())
+                .filter((result) => String(result.Status || '').toUpperCase() === 'FLAGGED')
+                .filter((result) => classFilter === 'ALL' || getResultClassValue(result) === classFilter)
+                .filter((result) => subjectFilter === 'ALL' || String(result.Subject || '').toUpperCase() === subjectFilter)
+                .sort((a, b) => new Date(b.Timestamp || 0) - new Date(a.Timestamp || 0));
+            lastInvigilatorFlaggedResults = flaggedResults;
+            renderInvigilatorRows(flaggedResults);
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Monitor Sync Failed.</td></tr>`;
+        }
+
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+
+    async function deleteFilteredFlaggedResults() {
+        const records = (lastInvigilatorFlaggedResults || [])
+            .filter(result => result.PK && result.SK && String(result.Status || '').toUpperCase() === 'FLAGGED')
+            .filter(result => !isTimeExpiryViolation(result.Violation))
+            .map(result => ({ pk: result.PK, sk: result.SK, status: result.Status, violation: result.Violation || "" }));
+        if (records.length === 0) return winAlert("No Flagged Results", "Load flagged students for a class and subject before deleting.");
+        const classFilter = getInvigilatorClassFilter();
+        const subjectFilter = normalizeInvigilatorSubjectInput();
+        winAlert("CONFIRM DELETION", `Delete ${records.length} flagged result(s) for ${classFilter} / ${subjectFilter}? Students will be able to re-write.`, "confirm", async () => {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            try {
+                const response = await fetch(AWS_CONFIG.registerEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: "DELETE_FLAGGED_RESULTS", records })
+                });
+                const result = await response.json();
+                if (!response.ok || result.status !== "success") throw new Error(result.message || "Could not delete flagged results.");
+                winAlert("Success", result.message || "Flagged results deleted.");
+                await refreshInvigilatorFeed();
+                if (typeof loadSchoolResults === 'function') loadSchoolResults();
+            } catch (e) {
+                winAlert("Delete Error", e.message || "Could not delete flagged results.");
+            }
+            document.getElementById('loading-overlay').style.display = 'none';
+        });
+    }
+
+    function isTimeExpiryViolation(value) {
+        const text = String(value || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+        return text === 'TIME EXPIRED' || text === 'EXPIRED TIME';
+    }
+
+    async function checkHealth() {
+        const start = Date.now();
+        try {
+            await fetch(`${AWS_CONFIG.getStudentsEndpoint}?action=GET_PORTAL_STATE&schoolID=${LOGGED_IN_SCHOOL_ID}`, { method: 'GET', mode: 'cors' });
+            const ms = Date.now() - start;
+            const pingDisplay = document.getElementById('ping-ms'), pingLarge = document.getElementById('ping-large');
+            if(pingDisplay) pingDisplay.innerText = ms + " ms";
+            if(pingLarge) pingLarge.innerText = ms + " ms";
+        } catch (e) { console.warn("Cloud unreachable."); }
+    }
+
+    function localSearch() { const q = document.getElementById('dir-search').value.toLowerCase(); const classFilterEl = document.getElementById('dir-class-filter'); const classFilter = classFilterEl ? classFilterEl.value : 'ALL'; const filtered = masterStudentList.filter(s => (classFilter === 'ALL' || s.Class === classFilter) && (s.FullName.toLowerCase().includes(q) || s.RegNo.toLowerCase().includes(q))); renderTable(filtered); }
+    function exportToExcel(tID, fn) { const table = document.getElementById(tID); if(!table || !table.rows.length) return; const wb = XLSX.utils.table_to_book(table, {sheet: "Export"}); XLSX.writeFile(wb, `${buildExportFilename(tID, fn)}.xlsx`); }
+
+    async function updateExamGlobal() {
+        const cat = document.getElementById('global-exam-type').value;
+        const h = parseInt(document.getElementById('timer-h').value) || 0; const m = parseInt(document.getElementById('timer-m').value) || 0; const s = parseInt(document.getElementById('timer-s').value) || 0;
+        const totalMinutes = (h * 60) + m + (s / 60);
+        const selectedPapers = window.LAECExamSession ? window.LAECExamSession.getSelectedPapers('exam-session-root') : [];
+        const liveWindow = window.LAECExamSession ? window.LAECExamSession.getWindowPayload('exam-session-root') : { startTime: "", endTime: "" };
+
+        if (cat === "#") return winAlert("Required", "Please select the active category.");
+        if ((liveWindow.startTime && !liveWindow.endTime) || (!liveWindow.startTime && liveWindow.endTime)) {
+            return winAlert("Required", "Set both live window values or leave both blank.");
+        }
+        if (liveWindow.startTime && liveWindow.endTime && new Date(liveWindow.endTime) <= new Date(liveWindow.startTime)) {
+            return winAlert("Required", "Live end time must be later than live start time.");
+        }
+        document.getElementById('loading-overlay').style.display = 'flex';
+        try {
+            await fetch(AWS_CONFIG.registerEndpoint, {
+                method: 'POST', mode: 'cors', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'UPDATE_EXAM_SETTINGS',
+                    schoolID: LOGGED_IN_SCHOOL_ID,
+                    type: cat,
+                    duration: totalMinutes,
+                    activePapers: selectedPapers,
+                    livePapers: selectedPapers,
+                    startTime: liveWindow.startTime || "",
+                    endTime: liveWindow.endTime || ""
+                })
+            });
+            winAlert("Success", `ICT synchronization complete. ${selectedPapers.length} paper slot(s) prepared for live access.`);
+        } catch (e) { winAlert("Error", "Sync failed."); }
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+
+    /*** Automatically updates the footer year to the current calendar year */
+        function updateFooterYear() {
+            const yearDisplay = document.getElementById('copyright-year');
+            if (yearDisplay) {
+                yearDisplay.innerText = new Date().getFullYear();
+            }
+        }
+
+    window.onload = () => {
+        startAdminIdleTracking();
+        syncHeaderOffset();
+        toggleBackToTopButton();
+        window.addEventListener('resize', syncHeaderOffset);
+        window.addEventListener('scroll', toggleBackToTopButton, { passive: true });
+        const adminName = localStorage.getItem('AdminName');
+        document.getElementById('school-identity').innerText = adminName ? `ICT ADMIN: ${adminName}` : (SCHOOL_NAMES[LOGGED_IN_SCHOOL_ID] || "ICT Center Admin");
+        document.getElementById('school-lock-display').value = SCHOOL_NAMES[LOGGED_IN_SCHOOL_ID] || "Locked";
+        restoreCachedModeUI();
+        if (window.LAECExamSession) {
+            window.LAECExamSession.init({
+                rootId: 'exam-session-root',
+                categorySelectId: 'global-exam-type',
+                schoolID: LOGGED_IN_SCHOOL_ID,
+                mode: 'MODE_B',
+                baseUrl: AWS_CONFIG.getStudentsEndpoint,
+                getCategory: () => document.getElementById('global-exam-type').value,
+                getYear: () => ACTIVE_SYNC_YEAR,
+                getTerm: () => ACTIVE_SYNC_TERM,
+                utils: LAEC
+            });
+        }
+        if (window.LAECRegistration) {
+            window.LAECRegistration.init({
+                rootId: 'register-portal-root',
+                schoolId: LOGGED_IN_SCHOOL_ID,
+                schoolName: SCHOOL_NAMES[LOGGED_IN_SCHOOL_ID] || "Locked School",
+                title: "Student Registration Portal",
+                subtitle: "Complete student onboarding directly from the ICT dashboard. The assigned school is automatically pulled from the logged-in ICT admin session and can no longer be changed manually.",
+                registerEndpoint: AWS_CONFIG.registerEndpoint,
+                utils: LAEC,
+                onAlert: winAlert,
+                onShowLoading: (message) => {
+                    document.getElementById('loading-overlay').style.display = 'flex';
+                    const label = document.getElementById('loading-overlay-text');
+                    if (label) label.innerText = message || 'LAEC School Portal Syncing...';
+                },
+                onHideLoading: () => {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                    const label = document.getElementById('loading-overlay-text');
+                    if (label) label.innerText = 'LAEC School Portal Syncing...';
+                },
+                onRefresh: () => loadSchoolStats()
+            });
+        }
+        restoreActiveTab();
+        loadSchoolStats(); 
+        setInterval(checkHealth, 10000); 
+        checkHealth();
+        updateFooterYear();
+    };
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4249eae0da6e746',t:'MTc5MDYxODEzNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

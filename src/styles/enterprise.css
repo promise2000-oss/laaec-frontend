@@ -1,0 +1,71 @@
+/*
+ * enterprise.css — admin console surface for /admin/, /ca/, /ict/ and /comm/
+ *
+ * Source of truth: COLOUR-SPEC.md §4 (the 15-token system — an identical
+ * :root block on all four pages), §5 (typography) and the live body rule
+ * (verified 2026-09-28).
+ *
+ * Every selector is scoped to the .surface-enterprise root class so tokens
+ * can only apply on their own routes. AdminLayout imports this file per-route.
+ */
+
+.surface-enterprise {
+  /* 15-token system */
+  --laec-blue: #123a63;
+  --laec-blue-deep: #0b2242;
+  --laec-accent: #4ec6ff;
+  --bg-light: #f2f6fb;
+  --bg-soft: #e8f0f8;
+  --white: #ffffff;
+  --text-dark: #15243d;
+  --text-soft: #5f7087;
+  /* --success / --danger darkened from COLOUR-SPEC #11895f / #c44444 (D-73):
+     at the spec values they measured 4.40:1 white-on-fill and 4.21:1 on the
+     #fbe9e9 badge tint — both short of WCAG AA. Same hues, AA-clean:
+     5.47:1 and 5.60:1 white-on-fill, 4.88:1 and 4.78:1 on their tints. */
+  --success: #107855;
+  --danger: #b83c3c;
+  --border: #d8e3f0;
+  --warning: #f1b844;
+  --shadow: 0 18px 45px rgba(12, 38, 69, 0.12);
+  /* Layout pair: the source defines these in /admin-sidebar.css, not the
+     page :root (COLOUR-SPEC §4) — kept here so the system is complete. */
+  --laec-sidebar-width: 292px;
+  --laec-topbar-height: 82px;
+}
+
+body.surface-enterprise {
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(78, 198, 255, 0.18), transparent 28%),
+    radial-gradient(circle at right 12%, rgba(17, 137, 95, 0.12), transparent 24%),
+    linear-gradient(180deg, #eef5fb 0%, #f9fbfd 52%, #eef4fa 100%);
+  color: var(--text-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-top: var(--header-offset, 220px);
+  position: relative;
+}
+
+/*
+ * The promotion alert carries a sentence; its siblings carry a label and a
+ * figure. Laid in as an ordinary grid cell it stretched the whole row to its
+ * own height, so every plain stat card became a tall box with the figure
+ * floating at the top of it, and the four cards plus the alert left one card
+ * orphaned on a row of its own. Spanning the grid as the last row keeps the
+ * four figures level and gives the alert the width its text wants.
+ * (ca / ict / comm only — /admin/ has no alert in its stats grid.)
+ */
+.surface-enterprise .stats-grid > #promotion-alert-banner {
+  order: 99;
+  grid-column: 1 / -1;
+}
+
+/*
+ * Typography notes (§5): KPI numerals (#count-total) use
+ * 'Space Grotesk', Manrope, sans-serif at 33.6px / weight 700 — the only place
+ * Space Grotesk renders. Applied with the admin page build, not here.
+ */

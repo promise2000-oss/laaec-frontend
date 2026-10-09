@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/enterprise-C3wxVrPf.css"])))=>i.map(i=>d[i]);
+import{n as e}from"./main-DZ6X4QNj.js";import{E as t,S as n,c as r,f as i,p as a}from"./runtime-core.esm-bundler-DL_3faYZ.js";var o={class:`surface-enterprise`},s=a({__name:`AdminLayout`,setup(a){return e(()=>Promise.resolve({}),__vite__mapDeps([0])),(e,a)=>{let s=t(`router-view`);return n(),r(`div`,o,[i(s)])}}});export{s as default};

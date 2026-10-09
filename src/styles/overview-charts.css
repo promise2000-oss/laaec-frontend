@@ -1,0 +1,107 @@
+/*
+ * src/styles/overview-charts.css — shared frame for the console Overview charts.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * Every console dashboard pairs a pie with a bar chart in a two-column card
+ * grid, and each one grew the same two problems independently:
+ *
+ *   - A canvas is `display: inline` with no intrinsic block height, so once the
+ *     charts set `maintainAspectRatio: false` (to stop a rotated axis label or
+ *     a bottom legend from stretching the card) chart.js had nothing to size
+ *     against and the drawing collapsed. The frame supplies a definite height.
+ *   - A bar chart swapped for an empty state changed the card's height, because
+ *     the canvas and the empty panel were sized independently. `min-height` on
+ *     the frame matches ChartEmptyState's own minimum, so the swap is not a
+ *     visible jump.
+ *
+ * This lives in one stylesheet rather than in each view because the rule set is
+ * identical across /admin/, /ca/, /comm/ and /ict/ — four copies is how they
+ * drifted apart in the first place. Scoped to the surface class, following the
+ * convention the generated page stylesheets use (see admin-page.css), so a
+ * console's rules cannot reach another console's cards.
+ *
+ * Imported by the four console views. Deliberately not part of any
+ * `*-page.css`: those are generated from the origin captures by
+ * tools/extract-page-css.mjs and are overwritten on regeneration.
+ */
+
+.surface-enterprise .overview-chart-frame {
+  position: relative;
+  width: 100%;
+  /* Matches ChartEmptyState's `min-height`; see the note above. */
+  min-height: 190px;
+}
+
+.surface-enterprise .overview-chart-canvas {
+  position: relative;
+  width: 100%;
+  height: 260px;
+}
+
+.surface-enterprise .overview-chart-canvas > canvas {
+  /* chart.js sets inline width/height on the canvas; these win so the canvas
+     fills the frame the stylesheet sized. */
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/*
+ * The pie keeps the 360px cap the origin gave it; only its height became fixed.
+ * `:not(.overview-chart-canvas-bars)` rather than a second class, so a pie frame
+ * is the default and a bar frame is the opt-in.
+ */
+.surface-enterprise .overview-chart-canvas:not(.overview-chart-canvas-bars) {
+  max-width: 360px;
+  margin: 0 auto;
+  height: 280px;
+}
+
+@media (max-width: 640px) {
+  .surface-enterprise .overview-chart-canvas,
+  .surface-enterprise .overview-chart-canvas:not(.overview-chart-canvas-bars) {
+    height: 230px;
+  }
+}
+
+/*
+ * Stat card captions and the latency tone scale.
+ *
+ * The four stat cards each carried their own inline font-size (2.1rem by
+ * default, 1.8rem for the session, 1.2rem for the mode), so the row read as
+ * four differently-sized cards; the mode card's long "INTERNAL (Colleges)"
+ * label was shrunk inline purely to fit. `.stat-sub` gives the long form a home
+ * as a caption, which is what lets every value keep one type size.
+ */
+.surface-enterprise .stat-card .value.stat-value-accent {
+  color: var(--laec-blue);
+}
+
+.surface-enterprise .stat-card .stat-sub {
+  margin: 0.3rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+}
+
+/*
+ * Latency tone. The three colours are the console's own --success / --warning /
+ * --danger tokens, so this is a threshold mapping rather than a new palette.
+ * The amber is the one exception and is commented where it is defined.
+ */
+.surface-enterprise .stat-card .value.stat-tone-unknown {
+  color: var(--laec-blue-deep);
+}
+.surface-enterprise .stat-card .value.stat-tone-good {
+  color: var(--success);
+}
+.surface-enterprise .stat-card .value.stat-tone-warn {
+  /* A darkened amber, the treatment --success and --danger got in D-73. The
+     --warning token itself (#f1b844) measures 1.70:1 on this card's gradient
+     and is a fill colour; #8f6212 is the same hue at 5.35:1 on white and
+     5.06:1 on #f4f9ff, clearing WCAG AA. */
+  color: #8f6212;
+}
+.surface-enterprise .stat-card .value.stat-tone-bad {
+  color: var(--danger);
+}

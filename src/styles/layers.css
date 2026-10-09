@@ -1,0 +1,79 @@
+/*
+ * layers.css — the single stacking-order contract (D-74).
+ *
+ * WHY THIS FILE EXISTS
+ * --------------------
+ * Before it, twenty-two unrelated z-index values (-3 … 10001) were declared
+ * across ten files with no ordering rule between them. The result was not a
+ * theoretical smell but a concrete defect: `.app-topbar` is `position: sticky`
+ * with `z-index: 550`, which *creates a stacking context*, and `.account-menu`
+ * and `.bell-panel` are `position: absolute` children of it. Their own
+ * `z-index: 700` is therefore evaluated inside the topbar's context and can
+ * never exceed 550 relative to the rest of the document — while `.back-to-top`
+ * and `.result-scroll-btn`, slotted into `.app-main` (which establishes no
+ * stacking context of its own), declared `z-index: 1200` and resolved against
+ * the root. Page furniture outranked the chrome it was never meant to touch,
+ * and an open dropdown could be painted over by content.
+ *
+ * THE CONTRACT
+ * ------------
+ * One ascending scale. Every numeric `z-index` in the project must be a
+ * reference to one of these tokens; `tools/check-layers.mjs` fails the build if
+ * a bare number survives. `z-index: auto` is deliberately not tokenised: it
+ * means "generate no stacking context", which is an absence of a layer, not a
+ * layer.
+ *
+ * Two groups, ordered strictly against each other:
+ *
+ *   content   under   chrome   under   overlays
+ *
+ * CHANGES FROM THE PRE-TOKEN VALUES (all deliberate)
+ * -------------------------------------------------
+ *  - Furniture (`.back-to-top`, `.result-scroll-btn`) drops from 900/1200 to
+ *    150, i.e. *below* the topbar. It never spatially overlaps the topbar — it
+ *    is bottom-right or mid-right — so nothing moves on screen, but it can no
+ *    longer paint over an open dropdown.
+ *  - The rail (600) still outranks the topbar (500) and the drawer scrim (550)
+ *    still sits between them, preserving the drawer's behaviour: scrim covers
+ *    the topbar, the rail stays visible above the scrim.
+ *  - Alert modals collapse from five different values (2000/5000/8000/9000/
+ *    9999/10000/10001) onto one (850). The relative order that mattered is
+ *    preserved: alerts sit above the loading overlay, exactly as the old
+ *    5000-over-2000 and DOM-order ties did.
+ *  - No colour, spacing or type value is touched here. COLOUR-SPEC governs
+ *    those and is unaffected.
+ */
+
+:root {
+  /* ── behind everything: decorative body layers ─────────────────────────── */
+  --z-under: -3;        /* was -3  (glass.css ::before)                       */
+  --z-under-near: -2;   /* was -2  (glass.css ::after)                        */
+
+  /* ── ambient page layers ───────────────────────────────────────────────── */
+  --z-base: 0;          /* was 0   (bubble-field)                             */
+
+  /* ── content ───────────────────────────────────────────────────────────── */
+  --z-content: 10;      /* was 1   (content wrappers, cards, login/home roots) */
+  --z-content-lift: 20; /* was 2   (sticky table headers)                     */
+
+  /* ── in-page sticky strips ─────────────────────────────────────────────── */
+  --z-sticky-sm: 30;    /* was 20  (exam question action strip)               */
+  --z-sticky: 100;      /* was 400/500/1000 (page banners, exam header)       */
+
+  /* ── fixed page furniture ──────────────────────────────────────────────── */
+  --z-furniture: 150;   /* was 900/1200 (back-to-top, result scroll arrows)   */
+
+  /* ── app chrome (above every content layer) ────────────────────────────── */
+  --z-topbar: 500;      /* was 550                                           */
+  --z-scrim: 550;       /* was 590  (drawer scrim: over topbar, under rail)   */
+  --z-rail: 600;        /* was 600  (rail / drawer stays above its scrim)     */
+  --z-dropdown: 700;    /* was 700  (account menu, bell panel — see note)     */
+
+  /* ── overlays (above all chrome) ───────────────────────────────────────── */
+  --z-loading: 800;     /* was 2000/9000                                     */
+  --z-modal: 850;       /* was 5000/8000/9000/9999/10000/10001               */
+
+  /* ── reserved ──────────────────────────────────────────────────────────── */
+  --z-toast: 900;       /* nothing uses it yet; it is the only thing allowed
+                           above --z-modal                                    */
+}

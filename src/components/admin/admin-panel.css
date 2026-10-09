@@ -1,0 +1,713 @@
+/*
+ * admin-panel.css — the shared vocabulary for the Saint Finbarr's admin panels.
+ *
+ * The teacher portal has `teacher-panel.css` and this is its sibling, not a copy
+ * of it: the prefix is `ap-` so a stylesheet from either family can be imported
+ * into the same scoped block without either one's class names colliding, and
+ * the console they live in (`/admin/`) is a different surface from `/teacher/`.
+ *
+ * Every value resolves through an existing token or a documented literal. No new
+ * colour scale is introduced: the palette is `--laec-blue` / `--laec-line` /
+ * `--text-muted`, the same three the rest of the portal uses.
+ */
+
+.ap-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--laec-line, #d7dee8);
+  padding-bottom: 0.375rem;
+}
+
+.ap-tab {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted, #5b6472);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.375rem 0.6875rem;
+  cursor: pointer;
+}
+
+.ap-tab:hover {
+  color: var(--laec-blue, #1c4e80);
+}
+
+.ap-tab--on {
+  background: #eaf2fb;
+  border-color: #bcd6f0;
+  color: #16457c;
+}
+
+.ap-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ap-toolbar__search {
+  flex: 1;
+  min-width: 180px;
+}
+
+.ap-toolbar__filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ap-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-filter select {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.4375rem 0.5rem;
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+}
+
+.ap-table-wrap {
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 12px;
+  overflow-x: auto;
+  background: #fff;
+}
+
+.ap-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.ap-table__caption {
+  caption-side: top;
+  text-align: left;
+  padding: 0.75rem 0.875rem 0;
+  font-size: 0.75rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-table th,
+.ap-table td {
+  text-align: left;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--laec-line, #d7dee8);
+  vertical-align: top;
+}
+
+.ap-table th {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #5b6472);
+  background: #f7f9fc;
+  white-space: nowrap;
+}
+
+.ap-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ap-table td.ap-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ap-row {
+  cursor: pointer;
+}
+
+.ap-row:hover {
+  background: #f7f9fc;
+}
+
+.ap-row:focus-visible {
+  outline: 2px solid var(--laec-blue, #1c4e80);
+  outline-offset: -2px;
+}
+
+.ap-table__actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.ap-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* The identity cell: the live list shows an avatar pair beside the name. */
+.ap-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ap-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: #eaf2fb;
+  color: #16457c;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ap-identity__text {
+  min-width: 0;
+}
+
+.ap-identity__name {
+  font-weight: 600;
+}
+
+.ap-identity__sub {
+  font-size: 0.6875rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: #eef2f7;
+  color: #45505f;
+  white-space: nowrap;
+}
+
+.ap-badge--ok { background: #e6f6ed; color: #14532d; }
+.ap-badge--warn { background: #fdf3dd; color: #8a6104; }
+.ap-badge--bad { background: #fbe9e9; color: #8f2a2a; }
+.ap-badge--info { background: #eaf2fb; color: #16457c; }
+
+.ap-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-pager__buttons {
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+}
+
+.ap-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+}
+
+.ap-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+  margin-bottom: 0.75rem;
+}
+
+.ap-field__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #3b4553;
+}
+
+.ap-field__req {
+  color: #8f2a2a;
+  margin-left: 0.125rem;
+}
+
+.ap-field__hint {
+  font-size: 0.6875rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-field--full {
+  grid-column: 1 / -1;
+}
+
+.ap-field--check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ap-input {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  width: 100%;
+}
+
+.ap-input:focus {
+  outline: 2px solid var(--laec-blue, #1c4e80);
+  outline-offset: 1px;
+}
+
+.ap-input[readonly] {
+  background: #f7f9fc;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-input--area {
+  resize: vertical;
+  min-height: 4rem;
+}
+
+/* ── quantity stepper and radio choices ─────────────────────────────────
+ * Both appear in the store cart: a line's quantity is a set-to, so it is
+ * offered as −/n/+ rather than a number input, and the payment method is a
+ * two-option choice. Grouped here rather than in the panel because the
+ * cart is the only place either is used today, and a rule that describes a
+ * control rather than a page belongs with the other controls.
+ */
+.ap-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+.ap-qty__value {
+  min-width: 1.75rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+}
+
+.ap-fieldset {
+  margin: 1rem 0 0;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 10px;
+  background: #f7f9fc;
+}
+
+.ap-fieldset__legend {
+  padding: 0 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.ap-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.ap-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.625rem 1rem;
+  margin: 0;
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 10px;
+  padding: 0.75rem 0.875rem;
+  background: #f7f9fc;
+}
+
+.ap-fields dt {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-fields dd {
+  margin: 0.125rem 0 0;
+  font-size: 0.8125rem;
+}
+
+.ap-btn {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 0.4375rem 0.8125rem;
+  cursor: pointer;
+  border: 1px solid var(--laec-line, #d7dee8);
+  background: #fff;
+  color: #3b4553;
+}
+
+.ap-btn:hover:not(:disabled) {
+  border-color: var(--laec-blue, #1c4e80);
+  color: var(--laec-blue, #1c4e80);
+}
+
+.ap-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ap-btn--primary {
+  background: var(--laec-blue, #1c4e80);
+  border-color: var(--laec-blue, #1c4e80);
+  color: #fff;
+}
+
+.ap-btn--primary:hover:not(:disabled) {
+  background: #16457c;
+  color: #fff;
+}
+
+.ap-btn--danger {
+  background: #a83232;
+  border-color: #a83232;
+  color: #fff;
+}
+
+.ap-btn--danger:hover:not(:disabled) {
+  background: #8f2a2a;
+  color: #fff;
+}
+
+.ap-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-btn--xs {
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.4375rem;
+}
+
+.ap-card {
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 12px;
+  padding: 1.125rem;
+  background: #fff;
+}
+
+.ap-card__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.ap-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.ap-statgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.75rem;
+}
+
+.ap-stat {
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-left: 4px solid var(--laec-accent, #c8a24a);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.75rem 0.875rem;
+}
+
+.ap-stat__label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-stat__value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #1f2933;
+  margin-top: 0.125rem;
+}
+
+.ap-stat__sub {
+  font-size: 0.6875rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid #a7d8bf;
+  background: #eefaf3;
+  color: #14532d;
+  border-radius: 10px;
+  padding: 0.75rem 0.875rem;
+}
+
+.ap-banner__body { flex: 1; font-size: 0.8125rem; min-width: 0; }
+.ap-banner__body p { margin: 0; }
+
+.ap-banner__close {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.125rem;
+  opacity: 0.7;
+}
+
+.ap-banner__close:hover { opacity: 1; }
+
+.ap-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 2rem 1rem;
+}
+
+.ap-loading__ring {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--laec-line, #d7dee8);
+  border-top-color: var(--laec-blue, #1c4e80);
+  animation: ap-spin 0.8s linear infinite;
+}
+
+@keyframes ap-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ap-loading__ring { animation-duration: 2.4s; }
+}
+
+.ap-loading__label {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-error {
+  border: 1px solid #f0c8c8;
+  background: #fdf3f3;
+  color: #8f2a2a;
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ap-error__text { margin: 0; font-size: 0.8125rem; }
+
+.ap-empty {
+  border: 1px dashed var(--laec-line, #d7dee8);
+  border-radius: 10px;
+  padding: 1.75rem 1.25rem;
+  text-align: center;
+  color: var(--text-muted, #5b6472);
+  font-size: 0.8125rem;
+}
+
+.ap-empty__cta { margin-top: 0.75rem; }
+
+.ap-band {
+  margin: 0.75rem 0 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #16457c;
+  background: #eaf2fb;
+  border-radius: 6px;
+  padding: 0.3125rem 0.5rem;
+  display: inline-block;
+}
+
+.ap-inline-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.ap-form__error {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: #8f2a2a;
+}
+
+.ap-detail__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+/* The dialog: the live portal opens create/edit in a modal, so this does too.
+   `var(--z-modal)` with no fallback — the project owns the scale in
+   `styles/layers.css`, and a local fallback here would be a second value for the
+   same token that could drift from it. */
+.ap-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  background: rgba(11, 34, 66, 0.55);
+  overflow-y: auto;
+}
+
+.ap-dialog__panel {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 640px;
+  box-shadow: 0 18px 44px rgba(11, 34, 66, 0.28);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 3rem);
+}
+
+.ap-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--laec-line, #d7dee8);
+}
+
+.ap-dialog__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.ap-dialog__body {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+}
+
+.ap-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--laec-line, #d7dee8);
+  flex-wrap: wrap;
+}
+
+.ap-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.25rem);
+  min-width: 170px;
+  background: #fff;
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(11, 34, 66, 0.18);
+  padding: 0.25rem;
+  /* The row menu is furniture: above the table it sits in, below the dialog. */
+  z-index: var(--z-furniture);
+}
+
+.ap-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 0.8125rem;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.4375rem 0.625rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.ap-menu__item:hover:not(:disabled) {
+  background: #f2f6fb;
+}
+
+.ap-menu__item--danger {
+  color: #8f2a2a;
+}
+
+.ap-menu__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ap-menu-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.ap-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.ap-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.ap-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.ap-check input[type='text'] { flex: 1; }
+
+@media (max-width: 640px) {
+  .ap-form { grid-template-columns: 1fr; }
+  .ap-dialog { padding: 0.75rem 0.5rem; }
+  .ap-dialog__panel { max-height: calc(100vh - 1.5rem); }
+}

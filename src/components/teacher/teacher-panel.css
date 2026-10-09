@@ -1,0 +1,312 @@
+/*
+ * Shared CSS for the St Finbarr's teacher-portal panels (D-72).
+ *
+ * Plain CSS rather than a scoped block per component because the panels share
+ * one table, one form and one button vocabulary and the point of the port is
+ * that they read as one surface. Every value resolves through an existing
+ * token (`--laec-*`) or a documented literal; nothing here introduces a new
+ * colour scale.
+ *
+ * Imported by each panel's `<style scoped>`, so `@import` inside a scoped block
+ * keeps the scoping behaviour for this file's own selectors.
+ */
+
+.tp-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--laec-line, #d7dee8);
+  padding-bottom: 0.375rem;
+}
+
+.tp-tab {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted, #5b6472);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.375rem 0.6875rem;
+  cursor: pointer;
+}
+
+.tp-tab:hover {
+  color: var(--laec-blue, #1c4e80);
+}
+
+.tp-tab--on {
+  background: #eaf2fb;
+  border-color: #bcd6f0;
+  color: #16457c;
+}
+
+.tp-table-wrap {
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 12px;
+  overflow-x: auto;
+  background: #fff;
+}
+
+.tp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.tp-table__caption {
+  caption-side: top;
+  text-align: left;
+  padding: 0.75rem 0.875rem 0;
+  font-size: 0.75rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.tp-table th,
+.tp-table td {
+  text-align: left;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--laec-line, #d7dee8);
+  vertical-align: top;
+}
+
+.tp-table th {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #5b6472);
+  background: #f7f9fc;
+  white-space: nowrap;
+}
+
+.tp-table tbody tr:last-child th,
+.tp-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tp-row {
+  cursor: pointer;
+}
+
+.tp-row:hover {
+  background: #f7f9fc;
+}
+
+.tp-row:focus-visible {
+  outline: 2px solid var(--laec-blue, #1c4e80);
+  outline-offset: -2px;
+}
+
+.tp-table__actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.tp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.tp-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+}
+
+.tp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+  margin-bottom: 0.75rem;
+}
+
+.tp-field__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #3b4553;
+}
+
+.tp-field__hint {
+  font-size: 0.6875rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.tp-input {
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  width: 100%;
+}
+
+.tp-input:focus {
+  outline: 2px solid var(--laec-blue, #1c4e80);
+  outline-offset: 1px;
+}
+
+.tp-input[readonly] {
+  background: #f7f9fc;
+  color: var(--text-muted, #5b6472);
+}
+
+.tp-input--area {
+  resize: vertical;
+  min-height: 4rem;
+}
+
+.tp-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.625rem 1rem;
+  margin: 0;
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 10px;
+  padding: 0.75rem 0.875rem;
+  background: #f7f9fc;
+}
+
+.tp-fields dt {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #5b6472);
+}
+
+.tp-fields dd {
+  margin: 0.125rem 0 0;
+  font-size: 0.8125rem;
+}
+
+.tp-btn {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 0.4375rem 0.8125rem;
+  cursor: pointer;
+  border: 1px solid var(--laec-line, #d7dee8);
+  background: #fff;
+  color: #3b4553;
+}
+
+.tp-btn:hover:not(:disabled) {
+  border-color: var(--laec-blue, #1c4e80);
+  color: var(--laec-blue, #1c4e80);
+}
+
+.tp-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tp-btn--primary {
+  background: var(--laec-blue, #1c4e80);
+  border-color: var(--laec-blue, #1c4e80);
+  color: #fff;
+}
+
+.tp-btn--primary:hover:not(:disabled) {
+  background: #16457c;
+  border-color: #16457c;
+  color: #fff;
+}
+
+.tp-btn--danger {
+  background: #a83232;
+  border-color: #a83232;
+  color: #fff;
+}
+
+.tp-btn--danger:hover:not(:disabled) {
+  background: #8f2a2a;
+  border-color: #8f2a2a;
+  color: #fff;
+}
+
+.tp-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted, #5b6472);
+}
+
+.tp-btn--xs {
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.4375rem;
+}
+
+.tp-btn--dangerish {
+  color: #8f2a2a;
+}
+
+.tp-empty__cta {
+  margin-top: 0.75rem;
+}
+
+.tp-card {
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 12px;
+  padding: 1.125rem;
+  background: #fff;
+}
+
+.tp-card__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.tp-band {
+  margin: 0.75rem 0 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #16457c;
+  background: #eaf2fb;
+  border-radius: 6px;
+  padding: 0.3125rem 0.5rem;
+}
+
+.tp-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.tp-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.tp-check input[type='text'] {
+  flex: 1;
+}
+
+.tp-inline-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted, #5b6472);
+}
+
+.tp-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tp-toolbar__search {
+  flex: 1;
+  min-width: 180px;
+}

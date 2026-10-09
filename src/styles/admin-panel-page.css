@@ -1,0 +1,131 @@
+/*
+ * admin-panel-page.css — the Saint Finbarr's College admin modules inside
+ * `/admin/`.
+ *
+ * WHY A SEPARATE STYLESHEET AND NOT `.surface-enterprise` RULES
+ * -------------------------------------------------------------
+ * `/admin/` ships a transcribed origin stylesheet, `styles/admin-page.css`, whose
+ * rules are scoped to `.page-admin`. Those rules describe the origin's own panels
+ * — the `#dashboard` stat cards, `#results` filters, `#exam-mgt` controls — and
+ * several of them are element-id selectors with no class to narrow them.
+ *
+ * The Saint Finbarr's modules bring their own vocabulary (`ap-` prefixed, in
+ * `components/admin/admin-panel.css`) but sit in the same box, so they need two
+ * things the origin stylesheet does not give them: a `.view-well` that behaves as
+ * a block rather than as an origin panel container, and a few overrides where the
+ * origin's global rules inside `.page-admin` would otherwise reach into a panel
+ * they were not written for.
+ *
+ * Everything here is deliberately narrow: each rule names `.ap-admin-panel` (the
+ * wrapper the view mounts around a module) or one `ap-` class. Nothing outside
+ * that boundary is touched, so the origin panels cannot regress.
+ */
+
+/* The module wrapper is a plain block. The origin's `.tab-panel` rules are
+   `display:none` / `display:block`, which is right; what it does not set is a
+   width, so an admin panel inside the well would sit at the well's natural width
+   rather than filling it. */
+.page-admin .ap-admin-panel {
+  display: block;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+/* The origin's `.view-well` is sized for a single panel's width and clips; the
+   admin modules carry their own table wrappers that scroll, so the well must not
+   clip them. */
+.page-admin .view-well {
+  min-width: 0;
+}
+
+/* Origin rules that are element-scoped and would reach a module. Each is neutralised
+   for the module subtree and restated as the panel's own behaviour. */
+.page-admin .ap-admin-panel table {
+  margin: 0;
+}
+
+/*
+ * `<header>` is the one bare element rule in the origin stylesheet that reaches
+ * this far, and it is the page MASTHEAD: `.page-admin header` sets
+ * `position: fixed; top/left/right: 0; width: 100%; z-index: var(--z-sticky)`
+ * plus a navy gradient and white text.
+ *
+ * `AdminModuleShell` and `AdminDialog` both use a `<header>` for their own
+ * headings, so the masthead rule applied to them: every module's heading row was
+ * pinned to the top-left of the viewport, 100 % of the window wide, over the rail
+ * (which carries a higher `z-index`), and its toolbar buttons sat underneath the
+ * rail where a click could not reach them. `AdminStudentsPanel`'s inline dialog
+ * header had the same outcome.
+ *
+ * `position: static` neutralises `top`/`left`/`right` for free; `z-index` has to
+ * be reset explicitly because it applies to a flex item even when unpositioned;
+ * and the rest is restated so the module header looks like a heading row rather
+ * than a masthead. Scoped to `.ap-admin-panel`, so the origin's own `<header>`
+ * on this page is untouched.
+ *
+ * The same class of bug is already documented and handled for the notification
+ * popup's `<header class="bell-head">` in `AppShell.vue`.
+ */
+.page-admin .ap-admin-panel header {
+  width: auto;
+  position: static;
+  z-index: auto;
+  margin: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.page-admin .ap-admin-panel input[type='text'],
+.page-admin .ap-admin-panel input[type='search'],
+.page-admin .ap-admin-panel input[type='number'],
+.page-admin .ap-admin-panel input[type='tel'],
+.page-admin .ap-admin-panel input[type='email'],
+.page-admin .ap-admin-panel input[type='date'],
+.page-admin .ap-admin-panel input[type='datetime-local'],
+.page-admin .ap-admin-panel input[type='time'],
+.page-admin .ap-admin-panel select,
+.page-admin .ap-admin-panel textarea {
+  font-family: inherit;
+  font-size: 0.8125rem;
+  /* The origin's `.view-well input` rule sets a fixed width, which truncates the
+     filter selects and the mark inputs. Reset it and let each control size itself. */
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.page-admin .ap-admin-panel .ap-input {
+  width: 100%;
+}
+
+.page-admin .ap-admin-panel .ap-filter select {
+  width: auto;
+}
+
+.page-admin .ap-admin-panel .ap-btn {
+  /* The origin restyles `button` inside `.view-well` for its own panels; the
+     module buttons are their own vocabulary and must not inherit that. */
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: none;
+}
+
+.page-admin .ap-admin-panel button:focus-visible {
+  outline: 2px solid var(--laec-blue, #1c4e80);
+  outline-offset: 1px;
+}
+
+/* Narrow viewports: the same treatment the origin panels get (D-59), so the module
+   tables scroll inside their own wrapper rather than pushing the page sideways. */
+@media (max-width: 768px) {
+  .page-admin .ap-admin-panel {
+    padding-bottom: 8px;
+  }
+}

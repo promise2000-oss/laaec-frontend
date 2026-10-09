@@ -1,0 +1,82 @@
+PRD actions: 38 | observed in code: 38
+
+=== OBSERVED PAYLOADS ===
+ADD_QUESTION  [question-management.js]  (POST-body)
+   keys: action, mode, schoolID, year, term, category, question
+BULK_UPLOAD_QUESTIONS  [admin.html, ca.html, comm.html, ict.html]  (POST-body)
+   keys: action(4x), schoolID(4x), testType(4x), questions(4x), durationMinutes(4x), assessmentInstruction(4x), shuffleQuestions(3x)
+CONFIRM_ADMIN_PASSWORD_RESET  [control.html]  (POST-body)
+   keys: action, username, code, newPassword
+CREATE_ADMIN_ACCESS  [admin.html, ca.html]  (POST-body)
+   keys: action(2x), schoolID(2x), fullName(2x), username(2x), email(2x), password(2x), targetRole(2x), creatorUsername(2x), creatorRole(2x), creatorSchoolID(2x)
+DELETE_ADMIN_ACCESS  [admin.html, ca.html]  (POST-body)
+   keys: action(2x), username(2x), email(2x), requestorUsername(2x), requestorRole(2x), requestorSchoolID, schoolID
+DELETE_FLAGGED_RESULTS  [admin.html, ca.html, comm.html, ict.html]  (POST-body)
+   keys: action(4x), records(4x)
+DELETE_QUESTION  [question-management.js]  (POST-body)
+   keys: action, pk, sk, mode, schoolID
+DELETE_QUESTION_PAPER  [question-management.js]  (POST-body)
+   keys: action, mode, schoolID, year, term, category, subject, studentClass
+DELETE_STUDENT  [ca.html, comm.html, ict.html]  (POST-body)
+   keys: action(3x), schoolID(3x), regNo(3x)
+DELETE_STUDENT_RESULT  [ca.html, comm.html, ict.html]  (POST-body)
+   keys: action(3x), pk(3x), sk(3x)
+DELETE_SUBJECT_RESULTS  [admin.html, ca.html, comm.html, ict.html]  (POST-body)
+   keys: action(4x), subject(4x), records(4x)
+END_STUDENT_SESSION  [exam.html, login.html]  (POST-body)
+   keys: action(2x), schoolID(2x), regNo(2x), sessionID(2x)
+EXECUTE_PROMOTION  [admin.html, ca.html]  (POST-body)
+   keys: action(3x), state(3x), schoolID(2x), specificStudents
+GET_COGNITO_ADMINS  [admin.html, ca.html]  (GET-query)
+   keys: action(3x), schoolID(3x), roles(3x)
+GET_CONFIG  [admin.html, ca.html, comm.html, ict.html]  (GET-query)
+   keys: action(4x), schoolID(3x)
+GET_DEMOTION_LOGS  [ca.html]  (GET-query)
+   keys: action, schoolID
+GET_EXAM_CONFIG  [exam.html]  (GET-query)
+   keys: action, schoolID
+GET_LIVE_SCHEDULE  [login.html]  (POST-body)
+   keys: action, schoolID, class, term, year, category, mode
+GET_PORTAL_STATE  [ca.html, comm.html, ict.html, login.html]  (GET-query)
+   keys: action(4x), schoolID(4x)
+GET_QUESTION_INVENTORY  [config.js]  (POST-body)
+   keys: action, schoolID, year, term, type, mode
+GET_RESULTS  [admin.html, ca.html, comm.html, ict.html, login.html]  (POST-body+GET-query)
+   keys: action(20x), schoolID(19x), year(20x), term(20x), mode(20x), targetSchool(6x), regNo(5x), subject(12x), category(13x), noCache(4x), class(4x), studentClass, studentArm, completionOnly
+GET_SECURE_QUESTIONS  [admin.html, ca.html, comm.html, exam.html, ict.html, login.html, config.js, question-management.js]  (POST-body)
+   keys: action(8x), schoolID(8x), year(8x), term(8x), class(7x), subject(7x), type(8x), mode(8x), pastOnly(4x), regNo(2x), noCache(3x), editorMode
+GET_STUDENTS  [admin.html, ca.html, comm.html, ict.html]  (GET-query)
+   keys: action(5x), schoolID(5x)
+GET_STUDENT_PROFILE  [login.html]  (GET-query)
+   keys: action, schoolID, regID
+REMARK_STUDENT_RESULTS  [admin.html, ca.html, comm.html, ict.html]  (POST-body)
+   keys: action(4x), records(4x)
+REQUEST_ADMIN_PASSWORD_RESET  [control.html]  (POST-body)
+   keys: action, username
+SEND_ADMIN_PASSWORD_CHANGED_EMAIL  [control.html]  (POST-body)
+   keys: action, username, newPassword, reason
+SUBMIT_EXAM_RESULT  [exam.html]  (POST-body)
+   keys: action, result
+TRIGGER_ARCHIVE  [admin.html]  (POST-body)
+   keys: action, year, term
+UPDATE_ADMIN_STATUS  [control.html]  (POST-body)
+   keys: action, schoolID, username, newStatus
+UPDATE_EXAM_SETTINGS  [admin.html, ca.html, comm.html, ict.html]  (POST-body)
+   keys: action(4x), type(4x), duration(4x), activePapers(4x), livePapers(4x), startTime(4x), endTime(4x), schoolID(3x)
+UPDATE_MODE  [admin.html, ca.html, comm.html, ict.html]  (POST-body)
+   keys: action(4x), mode(4x), schoolID(3x)
+UPDATE_PORTAL  [admin.html]  (POST-body)
+   keys: action, active
+UPDATE_QUESTION  [question-management.js]  (POST-body)
+   keys: action, pk, sk, mode, schoolID, question
+UPDATE_SESSION_CONFIG  [admin.html]  (POST-body)
+   keys: action, year, term, promotionActive
+UPDATE_STUDENT_CLASS_ARM  [ca.html, comm.html]  (POST-body)
+   keys: action(2x), schoolID(2x), regNo(2x), studentClass(2x), studentArm(2x)
+UPDATE_STUDENT_SUBJECTS  [ca.html, comm.html, ict.html, login.html]  (POST-body)
+   keys: action(4x), schoolID(4x), regNo(4x), subjects(4x), studentArm
+UPLOAD_QUESTION_IMAGE  [admin.html, ca.html, comm.html, ict.html]  (POST-body)
+   keys: action(4x), fileName(4x), fileType(4x), imageBase64(4x)
+
+=== NOT OBSERVED (shapes unknown -> unconfirmed) ===
+

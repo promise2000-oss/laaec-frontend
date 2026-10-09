@@ -1,0 +1,276 @@
+/*
+ * glass.css — "Glass" surface tokens for /, /login/ and /control/
+ *
+ * Source of truth: COLOUR-SPEC.md §2.1 (declared tokens), §2.2 (core palette),
+ * §2.3 (backgrounds — values re-verified against the live original 2026-09-28),
+ * §2.4 (bubble field) and §5 (typography).
+ *
+ * Every selector is scoped to the .surface-glass root class so tokens can only
+ * apply on their own routes. PublicLayout imports this file per-route.
+ * body carries two classes: the surface plus .page-home / .page-login /
+ * .page-control, because each glass page declares different tokens.
+ *
+ * EXCEPTION — `/` (2026-10-02)
+ * -----------------------------
+ * `/` was rebuilt to the NICEGENE DAILYAPP marketing design, so it no longer
+ * paints a centred, non-scrolling photographic body. Its own visuals live in
+ * styles/landing.css and its <body> rules below were reduced to the structural
+ * reset that design needs. /login/ and /control/ are untouched and still
+ * carry the transcribed §2.3 photographic backgrounds.
+ */
+
+/* ── §2.1 declared tokens ───────────────────────────────────────────────── */
+
+.surface-glass {
+  /* Structural: the layout root generates no box, so view roots become
+     <body>'s flex children exactly as in the original documents
+     (see styles/base.css). Custom properties still cascade. */
+  --laec-blue: #004a99;
+  --laec-accent: #00c2ff;
+  --white: #ffffff;
+}
+
+/* The layout root (a child of #app, never <body> itself) must not generate a
+   box — see styles/base.css. Kept separate from the token rule above so
+   <body> (which also carries .surface-glass) never receives display: contents. */
+#app > .surface-glass {
+  display: contents;
+}
+
+/*
+ * The translucent overlay tokens this page used to declare are gone. The
+ * rebuilt `/` paints its own fields from styles/landing.css and reads none of
+ * them, and leaving two dead declarations scoped to a live route would invite
+ * the next reader to reach for them. `--glass` survives on `/login/` below,
+ * which is the only page that still resolves it.
+ */
+
+/*
+ * /login/ re-declares --glass as an opaque card: same name, opposite meaning
+ * (COLOUR-SPEC §6, C2). Replicated as observed.
+ */
+.surface-glass.page-login {
+  --glass: rgba(255, 255, 255, 0.9);
+  --danger: #dc3545;
+  --success: #28a745;
+}
+
+.surface-glass.page-control {
+  --danger: #dc3545;
+  --success: #28a745;
+  --bg: #f4f7fa;
+}
+
+/* ── §2.2 core palette (informational — no tokens exist for these in the source)
+ *
+ *   primary blue   #004a99   buttons, labels, h2, h1, tick marks
+ *   accent cyan    #00c2ff   vendor link, bubble highlights, radial glow
+ *   deep navy      #0b2f57   body background on / and /control/
+ *   deeper navy    #001f3f   overlay gradient end stop
+ *   mid navy       #003366   /login/ overlay end stop, .nicegene-brand on /control/
+ *   white          #ffffff   headings, body copy, button text
+ *   danger red     #dc3545   error text, "PORTAL CLOSED", alert border
+ *   success green  #28a745   success messages
+ */
+
+/* ── §5 typography — Inter 400/600/800 loaded from Google Fonts in each head ── */
+
+/*
+ * Body-scoped (not bare .surface-glass): the layout root sits between <body>
+ * and the view, and its own font-family would shadow body's — on /login/
+ * that would replace 'Inter','Segoe UI' with the wrapper's stack and defeat
+ * D-25 (no Inter on login → Segoe UI must win).
+ */
+body.surface-glass {
+  font-family: Inter, sans-serif;
+}
+
+.surface-glass.page-login {
+  font-family: Inter, 'Segoe UI', sans-serif;
+}
+
+/* ── §2.3 backgrounds — one photo per page, overlays fixed, verified live ── */
+
+/* /
+ *
+ * The reference lays this page out as a normal scrolling document — a sticky
+ * header over stacked full-width sections — not as a centred card on a fixed
+ * photograph. The transcribed centred-flex body (and its two fixed background
+ * layers) would have clipped the page to one screen and centred the stack
+ * vertically, so it is gone; what remains is the reset the new layout needs.
+ *
+ * The hero photograph is an element inside the hero section now, not a
+ * pseudo-element on <body>, so there is deliberately no `::before`/`::after`
+ * here for this page. The bubble field below still applies, but `/` no longer
+ * renders one.
+ */
+body.surface-glass.page-home {
+  /* margin 0: the transcribed `*` reset covered body on the original pages;
+     this page has no document-wide reset, so the UA's 8px margin is cancelled
+     here. See styles/landing.css §2. */
+  margin: 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* The reference's <body> background. Sections paint their own fields, so this
+     shows only where they do not reach. */
+  background-color: #eff0f7;
+}
+
+/*
+ * /login/ — no background-color fallback anywhere: html and body both compute
+ * to rgba(0,0,0,0) and the gradient is painted on body itself (COLOUR-SPEC C10,
+ * RF-106). Replicated as observed — do not add a solid base.
+ */
+body.surface-glass.page-login {
+  min-height: 100%;
+  margin: 0;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+  overflow-y: auto;
+  background: linear-gradient(rgba(0, 74, 153, 0.8), rgba(0, 51, 102, 0.9)),
+    url('https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+body.surface-glass.page-control {
+  min-height: 100%;
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #0b2f57;
+}
+
+body.surface-glass.page-control::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url('https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1600&q=80');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transform: scale(1.02);
+  z-index: var(--z-under);
+}
+
+body.surface-glass.page-control::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at top left, rgba(0, 194, 255, 0.18), transparent 28%),
+    linear-gradient(rgba(0, 74, 153, 0.68), rgba(0, 31, 63, 0.86));
+  z-index: var(--z-under-near);
+}
+
+/*
+ * The six role-scoped doors under /login/* render the same ControlView with a
+ * `portal` prop and add a door switcher beneath the card.
+ *
+ * The origin's body above is a centred, non-scrolling flex row, so a second
+ * block would sit beside the card rather than under it. These pages therefore
+ * stack and scroll. Declared here, not in the view, so it wins over
+ * `body.surface-glass.page-control` above on source order while the
+ * `.page-control` card and form rules below it keep applying unchanged.
+ */
+body.surface-glass.page-control-door {
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  overflow-y: auto;
+  padding: 32px 16px;
+}
+
+/* ── html-level base rules (per-page, as observed) ────────────────────── */
+
+html:has(body.surface-glass.page-home),
+html:has(body.surface-glass.page-control) {
+  min-height: 100%;
+}
+
+html:has(body.surface-glass.page-login) {
+  height: 100%;
+}
+
+/* /
+ * The 650px switch below applied to the old centred layout, which had to become
+ * scrollable and top-aligned on narrow screens. The rebuilt page is a normal
+ * document flow at every width, so the switch is gone.
+ */
+
+/* ── §2.4 bubble field — identical on all three glass pages ─────────────── */
+
+.surface-glass .bubble-field {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-base);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.surface-glass .bubble {
+  position: absolute;
+  bottom: -18vh;
+  width: var(--size);
+  height: var(--size);
+  left: var(--left);
+  border-radius: 50% 50% 48% 52%;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.9) 0 8%, transparent 9%),
+    radial-gradient(circle at 70% 78%, rgba(0, 194, 255, 0.18), transparent 35%),
+    rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow:
+    inset 0 0 18px rgba(255, 255, 255, 0.28),
+    inset -10px -14px 28px rgba(0, 194, 255, 0.08),
+    0 10px 34px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transform: translate3d(0, 0, 0) scale(0.86);
+  animation: bubbleFloat var(--duration) linear infinite;
+  animation-delay: var(--delay);
+}
+
+.surface-glass .bubble::after {
+  content: '';
+  position: absolute;
+  inset: 14% 18% auto auto;
+  width: 22%;
+  height: 22%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  filter: blur(1px);
+}
+
+@keyframes bubbleFloat {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.82);
+  }
+  12% {
+    opacity: 0.72;
+  }
+  50% {
+    transform: translate3d(var(--drift), -56vh, 0) scale(1);
+  }
+  88% {
+    opacity: 0.58;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(var(--drift) * -0.45), -118vh, 0) scale(1.12);
+  }
+}

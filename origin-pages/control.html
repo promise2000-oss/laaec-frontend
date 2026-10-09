@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAEC | Admin Command Center</title>
+    <link rel="icon" href="/laec%20logo.png" type="image/png">
+    
+    <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
+    <script src="/config.js"></script>
+    
+    <style>
+        :root { --laec-blue: #004a99; --laec-accent: #00c2ff; --bg: #f4f7fa; --success: #28a745; --danger: #dc3545; }
+        html, body { min-height: 100%; }
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            position: relative;
+            isolation: isolate;
+            overflow: hidden;
+            background-color: #0b2f57;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image: url('https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1600&q=80');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            transform: scale(1.02);
+            z-index: -3;
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at top left, rgba(0, 194, 255, 0.18), transparent 28%),
+                linear-gradient(rgba(0, 74, 153, 0.68), rgba(0, 31, 63, 0.86));
+            z-index: -2;
+        }
+        .bubble-field {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .bubble {
+            position: absolute;
+            bottom: -18vh;
+            width: var(--size);
+            height: var(--size);
+            left: var(--left);
+            border-radius: 50% 50% 48% 52%;
+            background:
+                radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.9) 0 8%, transparent 9%),
+                radial-gradient(circle at 70% 78%, rgba(0, 194, 255, 0.18), transparent 35%),
+                rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            box-shadow:
+                inset 0 0 18px rgba(255, 255, 255, 0.28),
+                inset -10px -14px 28px rgba(0, 194, 255, 0.08),
+                0 10px 34px rgba(0, 0, 0, 0.08);
+            opacity: 0;
+            transform: translate3d(0, 0, 0) scale(0.86);
+            animation: bubbleFloat var(--duration) linear infinite;
+            animation-delay: var(--delay);
+        }
+        .bubble::after {
+            content: "";
+            position: absolute;
+            inset: 14% 18% auto auto;
+            width: 22%;
+            height: 22%;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.28);
+            filter: blur(1px);
+        }
+        @keyframes bubbleFloat {
+            0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.82); }
+            12% { opacity: 0.72; }
+            50% { transform: translate3d(var(--drift), -56vh, 0) scale(1); }
+            88% { opacity: 0.58; }
+            100% { opacity: 0; transform: translate3d(calc(var(--drift) * -0.45), -118vh, 0) scale(1.12); }
+        }
+        .login-card {
+            position: relative;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.96);
+            padding: 2.5rem;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.16);
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+            border-top: 5px solid var(--laec-blue);
+        }
+        .logo { height: 60px; margin-bottom: 1rem; }
+        h2 { color: var(--laec-blue); margin-bottom: 0.5rem; font-size: 1.4rem; font-weight: 800; }
+        p { color: #666; font-size: 0.85rem; margin-bottom: 2rem; }
+        .input-group { text-align: left; margin-bottom: 1.2rem; }
+        label { display: block; font-size: 0.7rem; font-weight: 700; color: #444; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 0.95rem; outline: none; transition: 0.3s; }
+        input:focus { border-color: var(--laec-blue); box-shadow: 0 0 0 3px rgba(0,74,153,0.1); }
+        .password-field { position: relative; }
+        .password-field input { padding-right: 46px; }
+        .password-toggle {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            margin: 0;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: #777777;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .password-toggle svg { width: 19px; height: 19px; stroke: currentColor; }
+        .password-toggle:hover { background: rgba(119,119,119,0.12); transform: translateY(-50%); }
+        button { width: 100%; padding: 14px; background: var(--laec-blue); color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.3s; margin-top: 10px; font-size: 0.9rem; }
+        button:hover { background: #003366; transform: translateY(-1px); }
+        #msg, #msg-new, #msg-forgot { margin-top: 15px; font-size: 0.8rem; font-weight: 600; min-height: 1.2rem; line-height: 1.4; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid var(--laec-blue); border-radius: 50%; width: 22px; height: 22px; animation: spin 1s linear infinite; display: none; margin: 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* New Password UI styling */
+        .password-requirements { text-align: left; font-size: 11px; color: #777; margin-top: 10px; padding: 12px; background: #f9f9f9; border-radius: 8px; border: 1px solid #eee; }
+        .req-item { margin-bottom: 4px; display: flex; align-items: center; gap: 6px; transition: 0.2s; }
+        .req-item.valid { color: var(--success); font-weight: bold; }
+        .req-item.valid span::before { content: '✔'; }
+        .req-item span::before { content: '○'; width: 12px; display: inline-block; }
+
+        /* --- CUSTOM MODAL STYLES --- */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; }
+        .modal-box { background: white; padding: 2rem; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.2); animation: modalPop 0.3s ease; }
+        @keyframes modalPop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .modal-box h3 { color: var(--laec-blue); margin-top: 0; }
+        .modal-box p { margin-bottom: 1.5rem; color: #444; }
+        .modal-btn { background: var(--laec-blue); color: white; padding: 10px 25px; border-radius: 6px; border: none; font-weight: 700; cursor: pointer; }
+
+        /* INTEGRATED: Forgot Password Link styling */
+        .forgot-link { display: block; margin-top: 15px; font-size: 0.75rem; color: var(--laec-blue); text-decoration: none; font-weight: 600; cursor: pointer; }
+        .forgot-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body><a href="https://www.laaec.com/cdn-cgi/content?id=Gj4K2ZxlSQ0UUGPHMP.NaPgqzH_cDfXxSFtv_5ICnHw-1790617531.13343-1.2.1.1-Z1INYSXZhcbHVXLTH0FaPHDwE9sIYTPP1qenrifFY_l9mNdj7uYFW.L8tPFLWsha" aria-hidden="true" rel="nofollow noopener" style="display: none !important; visibility: hidden !important"></a>
+
+<div class="bubble-field" aria-hidden="true">
+    <span class="bubble" style="--size: 72px; --left: 6%; --duration: 19s; --delay: -4s; --drift: 34px;"></span>
+    <span class="bubble" style="--size: 46px; --left: 14%; --duration: 15s; --delay: -10s; --drift: -26px;"></span>
+    <span class="bubble" style="--size: 118px; --left: 24%; --duration: 24s; --delay: -7s; --drift: 52px;"></span>
+    <span class="bubble" style="--size: 58px; --left: 38%; --duration: 17s; --delay: -2s; --drift: -42px;"></span>
+    <span class="bubble" style="--size: 92px; --left: 52%; --duration: 22s; --delay: -13s; --drift: 30px;"></span>
+    <span class="bubble" style="--size: 40px; --left: 63%; --duration: 14s; --delay: -5s; --drift: -18px;"></span>
+    <span class="bubble" style="--size: 132px; --left: 72%; --duration: 27s; --delay: -15s; --drift: -58px;"></span>
+    <span class="bubble" style="--size: 64px; --left: 84%; --duration: 18s; --delay: -8s; --drift: 36px;"></span>
+    <span class="bubble" style="--size: 34px; --left: 93%; --duration: 13s; --delay: -1s; --drift: -24px;"></span>
+</div>
+
+<div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+        <h3 id="modal-title">Security Notice</h3>
+        <p id="modal-msg"></p>
+        <button class="modal-btn" onclick="closeModal()">DISMISS</button>
+    </div>
+</div>
+
+<div class="login-card" id="auth-container">
+    <img src="/laec logo.png" alt="LAEC" class="logo">
+    
+    <div id="login-form">
+        <h2>ADMIN PORTAL</h2>
+        <p>Lagos Archdiocesan Education Commission</p>
+
+        <div class="input-group">
+            <label>Admin ID / Username</label>
+            <input type="text" id="username" placeholder="Enter Admin ID or Username">
+        </div>
+
+        <div class="input-group">
+            <label>Secure Password</label>
+            <div class="password-field">
+                <input type="password" id="password" placeholder="••••••••">
+                <button type="button" class="password-toggle" aria-label="Show password" aria-pressed="false" onclick="togglePasswordVisibility('password', this)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle><path d="M4 12h16"></path></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="loader" id="loader"></div>
+        <div id="msg"></div>
+        <button onclick="handleAdminLogin()">AUTHORIZE SESSION</button>
+        <span class="forgot-link" onclick="showForgotPassword()">Forgotten Password?</span>
+    </div>
+
+    <div id="new-password-form" style="display:none;">
+        <h2 style="color: var(--success);">Security Update</h2>
+        <p>Your temporary password has expired. Please set a new permanent password.</p>
+
+        <div class="input-group">
+            <label>New Password</label>
+            <div class="password-field">
+                <input type="password" id="new-password" placeholder="Set your password" onkeyup="validatePassword(this.value, 'req-')">
+                <button type="button" class="password-toggle" aria-label="Show password" aria-pressed="false" onclick="togglePasswordVisibility('new-password', this)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle><path d="M4 12h16"></path></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Confirm New Password</label>
+            <div class="password-field">
+                <input type="password" id="confirm-password" placeholder="Repeat new password">
+                <button type="button" class="password-toggle" aria-label="Show password" aria-pressed="false" onclick="togglePasswordVisibility('confirm-password', this)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle><path d="M4 12h16"></path></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="password-requirements">
+            <div class="req-item" id="req-len"><span></span> At least 8 characters</div>
+            <div class="req-item" id="req-case"><span></span> Uppercase & Lowercase</div>
+            <div class="req-item" id="req-num"><span></span> At least one number</div>
+            <div class="req-item" id="req-sym"><span></span> One symbol (@, #, $, !)</div>
+        </div>
+
+        <div class="loader" id="loader-new"></div>
+        <div id="msg-new"></div>
+        <button id="update-btn" onclick="handlePasswordChange()" style="background: var(--success);">UPDATE & LOGIN</button>
+    </div>
+
+    <div id="forgot-password-form" style="display:none;">
+        <h2>Reset Password</h2>
+        <p id="forgot-step-text">Enter your Admin ID to receive a verification code.</p>
+
+        <div id="step-1-forgot">
+            <div class="input-group">
+                <label>Admin ID / Username</label>
+                <input type="text" id="forgot-username" placeholder="Enter Registration ID">
+            </div>
+            <button onclick="handleRequestReset()">SEND RECOVERY CODE</button>
+        </div>
+
+        <div id="step-2-forgot" style="display:none;">
+            <div class="input-group">
+                <label>Verification Code</label>
+                <input type="text" id="verification-code" placeholder="Check your email">
+            </div>
+            <div class="input-group">
+                <label>New Secure Password</label>
+                <div class="password-field">
+                    <input type="password" id="forgot-new-password" placeholder="Min. 8 characters" onkeyup="validatePassword(this.value, 'f-req-')">
+                    <button type="button" class="password-toggle" aria-label="Show password" aria-pressed="false" onclick="togglePasswordVisibility('forgot-new-password', this)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle><path d="M4 12h16"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="password-requirements">
+                <div class="req-item" id="f-req-len"><span></span> At least 8 characters</div>
+                <div class="req-item" id="f-req-case"><span></span> Uppercase & Lowercase</div>
+                <div class="req-item" id="f-req-num"><span></span> At least one number</div>
+                <div class="req-item" id="f-req-sym"><span></span> One symbol (@, #, $, !)</div>
+            </div>
+            <button onclick="handleConfirmReset()">SET NEW PASSWORD</button>
+        </div>
+
+        <div class="loader" id="loader-forgot"></div>
+        <div id="msg-forgot"></div>
+        <span class="forgot-link" onclick="location.reload()">Back to Login</span>
+    </div>
+</div>
+
+<script>
+    const poolData = {
+        UserPoolId: 'us-east-1_K9Rbj2rSw',
+        ClientId: '1rhsndrfu8gf4pjmfn4rp4q5og'
+    };
+    const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+    let currentCognitoUser = null;
+    let returnHomeTimer = null;
+    const adminSessionID = localStorage.getItem('AdminSessionID') || `ADM_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const PASSWORD_EYE_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    const PASSWORD_EYE_CLOSED = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle><path d="M4 12h16"></path></svg>';
+
+    function togglePasswordVisibility(inputId, button) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const shouldShow = input.type === 'password';
+        input.type = shouldShow ? 'text' : 'password';
+        if (button) {
+            button.setAttribute('aria-label', shouldShow ? 'Hide password' : 'Show password');
+            button.setAttribute('aria-pressed', shouldShow ? 'true' : 'false');
+            button.innerHTML = shouldShow ? PASSWORD_EYE_OPEN : PASSWORD_EYE_CLOSED;
+        }
+    }
+
+    function startControlReturnHomeTimer() {
+        clearTimeout(returnHomeTimer);
+        returnHomeTimer = setTimeout(() => {
+            if (!localStorage.getItem('LAEC_Session')) {
+                window.location.replace("/");
+            }
+        }, 2 * 60 * 1000);
+    }
+
+    function clearControlReturnHomeTimer() {
+        clearTimeout(returnHomeTimer);
+    }
+
+    // CUSTOM ALERT FUNCTIONS
+    function winAlert(title, message) {
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-msg').innerText = message;
+        document.getElementById('modal-overlay').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('modal-overlay').style.display = 'none';
+    }
+
+    function validatePassword(val, prefix) {
+        const reqs = {
+            len: val.length >= 8,
+            case: /[a-z]/.test(val) && /[A-Z]/.test(val),
+            num: /\d/.test(val),
+            sym: /[@$!%*?&]/.test(val)
+        };
+
+        Object.keys(reqs).forEach(key => {
+            const el = document.getElementById(prefix + key);
+            if (el) {
+                if (reqs[key]) el.classList.add('valid');
+                else el.classList.remove('valid');
+            }
+        });
+        
+        return Object.values(reqs).every(v => v === true);
+    }
+
+    async function postAdminPasswordAction(payload) {
+        const response = await fetch(AWS_CONFIG.registerEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.status === "error") {
+            throw new Error(data.message || data.error || "Password email request failed.");
+        }
+        return data;
+    }
+
+    async function handleAdminLogin() {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const msg = document.getElementById('msg');
+        const loader = document.getElementById('loader');
+        clearControlReturnHomeTimer();
+
+        if (!username || !password) {
+            msg.innerText = "Credentials required.";
+            msg.style.color = "red";
+            startControlReturnHomeTimer();
+            return;
+        }
+
+        loader.style.display = "block";
+        msg.innerText = "Verifying Authority...";
+        msg.style.color = "var(--laec-blue)";
+
+        const authenticationData = { Username: username, Password: password };
+        const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails(authenticationData);
+        
+        const userData = { Username: username, Pool: userPool };
+        currentCognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+
+        currentCognitoUser.authenticateUser(authenticationDetails, {
+            onSuccess: (result) => processLoginSuccess(result),
+            onFailure: (err) => {
+                msg.innerText = err.message || "Login failed.";
+                msg.style.color = "red";
+                loader.style.display = "none";
+                startControlReturnHomeTimer();
+            },
+            newPasswordRequired: () => {
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('new-password-form').style.display = 'block';
+            }
+        });
+    }
+
+    // --- INTEGRATED: FORGOT PASSWORD HANDLERS ---
+
+    function showForgotPassword() {
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('forgot-password-form').style.display = 'block';
+    }
+
+    async function handleRequestReset() {
+        const username = document.getElementById('forgot-username').value.trim();
+        const msg = document.getElementById('msg-forgot');
+        const loader = document.getElementById('loader-forgot');
+
+        if (!username) { msg.innerText = "Please enter your Admin ID."; return; }
+
+        loader.style.display = "block";
+        msg.innerText = "Sending recovery code...";
+        msg.style.color = "var(--laec-blue)";
+
+        try {
+            const data = await postAdminPasswordAction({
+                action: "REQUEST_ADMIN_PASSWORD_RESET",
+                username: username
+            });
+            loader.style.display = "none";
+            document.getElementById('step-1-forgot').style.display = 'none';
+            document.getElementById('step-2-forgot').style.display = 'block';
+            document.getElementById('forgot-step-text').innerText = data.message || "Recovery code sent to your registered email.";
+            msg.innerText = "";
+        } catch (err) {
+            msg.innerText = err.message;
+            msg.style.color = "red";
+            loader.style.display = "none";
+        }
+    }
+
+    async function handleConfirmReset() {
+        const username = document.getElementById('forgot-username').value.trim();
+        const code = document.getElementById('verification-code').value;
+        const newPass = document.getElementById('forgot-new-password').value;
+        const msg = document.getElementById('msg-forgot');
+        const loader = document.getElementById('loader-forgot');
+
+        if (!validatePassword(newPass, 'f-req-')) {
+            msg.innerText = "Password must meet all requirements.";
+            msg.style.color = "red";
+            return;
+        }
+
+        loader.style.display = "block";
+        msg.innerText = "Updating password...";
+        msg.style.color = "var(--laec-blue)";
+
+        try {
+            const data = await postAdminPasswordAction({
+                action: "CONFIRM_ADMIN_PASSWORD_RESET",
+                username: username,
+                code: code,
+                newPassword: newPass
+            });
+            loader.style.display = "none";
+            winAlert("Success", data.message || "Password updated successfully. Updated login details have been emailed.");
+            setTimeout(() => { location.reload(); }, 3000);
+        } catch (err) {
+            msg.innerText = err.message;
+            msg.style.color = "red";
+            loader.style.display = "none";
+        }
+    }
+
+    // --- PASSWORD CHANGE HANDLER ---
+
+    function handlePasswordChange() {
+        const newPass = document.getElementById('new-password').value;
+        const confPass = document.getElementById('confirm-password').value;
+        const msg = document.getElementById('msg-new');
+        const loader = document.getElementById('loader-new');
+
+        if (newPass !== confPass) {
+            msg.innerText = "Passwords do not match!";
+            msg.style.color = "red";
+            return;
+        }
+
+        if (!validatePassword(newPass, 'req-')) {
+            msg.innerText = "Please meet all security requirements.";
+            msg.style.color = "red";
+            return;
+        }
+
+        loader.style.display = "block";
+        document.getElementById('update-btn').disabled = true;
+
+        currentCognitoUser.completeNewPasswordChallenge(newPass, {}, {
+            onSuccess: (result) => processLoginSuccess(result, newPass),
+            onFailure: (err) => {
+                msg.innerText = err.message || "Failed to update.";
+                msg.style.color = "red";
+                loader.style.display = "none";
+                document.getElementById('update-btn').disabled = false;
+            }
+        });
+    }
+
+    async function startAdminSessionLock({ schoolId, username, role }) {
+        if (!username || !role) throw new Error("Missing admin session details.");
+    }
+
+    async function processLoginSuccess(result, changedPassword = "") {
+        const idToken = result.getIdToken().payload;
+        const role = String(idToken['custom:Role'] || idToken['custom:role'] || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+        const schoolId = String(idToken['custom:SchoolID'] || idToken['custom:schoolID'] || idToken['custom:schoolId'] || "").trim().toUpperCase();
+        const fullName = idToken['name'] || "Admin";
+        const username = currentCognitoUser.getUsername(); // Captured for Status Sync
+        clearControlReturnHomeTimer();
+
+        if (['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ICT_ADMIN', 'EXAM_COMMITTEE'].includes(role)) {
+            try {
+                await startAdminSessionLock({ schoolId, username, role });
+            } catch (error) {
+                currentCognitoUser.signOut();
+                const activeMsgId = document.getElementById('forgot-password-form').style.display === 'block' ? 'msg-forgot' : 
+                                  (document.getElementById('new-password-form').style.display === 'none' ? 'msg' : 'msg-new');
+                const msgEl = document.getElementById(activeMsgId);
+                if (msgEl) {
+                    msgEl.innerText = error.message;
+                    msgEl.style.color = "red";
+                } else {
+                    winAlert("Session Active", error.message);
+                }
+                document.querySelectorAll('.loader').forEach(loader => loader.style.display = "none");
+                startControlReturnHomeTimer();
+                return;
+            }
+
+            localStorage.setItem('LAEC_Session', result.getAccessToken().getJwtToken());
+            localStorage.setItem('AdminName', fullName);
+            localStorage.setItem('SchoolID', schoolId);
+            localStorage.setItem('AdminRole', role);
+            localStorage.setItem('AdminUsername', username);
+            localStorage.setItem('AdminSessionID', adminSessionID);
+
+            // --- INTEGRATED: DYNAMODB STATUS SYNCHRONIZATION ---
+            const completedFirstLoginPasswordChange = document.getElementById('new-password-form').style.display === 'block';
+            if (completedFirstLoginPasswordChange) {
+                fetch(AWS_CONFIG.registerEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: "UPDATE_ADMIN_STATUS",
+                        schoolID: schoolId,
+                        username: username,
+                        newStatus: "ACTIVE"
+                    })
+                }).catch(e => console.warn("Status Sync Request Failed", e));
+
+                if (changedPassword) {
+                    postAdminPasswordAction({
+                        action: "SEND_ADMIN_PASSWORD_CHANGED_EMAIL",
+                        username: username,
+                        newPassword: changedPassword,
+                        reason: "FIRST_LOGIN_PASSWORD_CHANGE"
+                    }).catch(e => console.warn("Password Change Email Failed", e));
+                }
+            }
+
+            const activeMsgId = document.getElementById('forgot-password-form').style.display === 'block' ? 'msg-forgot' : 
+                              (document.getElementById('new-password-form').style.display === 'none' ? 'msg' : 'msg-new');
+            
+            const msgEl = document.getElementById(activeMsgId);
+            if (msgEl) {
+                msgEl.innerText = "Access Granted! Loading Secure Dashboard...";
+                msgEl.style.color = "green";
+            }
+
+            setTimeout(() => {
+                if (role === 'SUPER_ADMIN') window.location.href = "/admin/";
+                else if (role === 'SCHOOL_ADMIN') window.location.href = "/ca/";
+                else if (role === 'ICT_ADMIN') window.location.href = "/ict/";
+                else if (role === 'EXAM_COMMITTEE') window.location.href = "/comm/";
+            }, 1000);
+        } else {
+            winAlert("Unauthorized", "This account does not have Admin privileges. Access Restricted.");
+            currentCognitoUser.signOut();
+            setTimeout(() => { location.reload(); }, 3000);
+        }
+    }
+
+    window.addEventListener('load', startControlReturnHomeTimer);
+</script>
+
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4248ff19a10d0ae',t:'MTc5MDYxNzUzMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

@@ -1,0 +1,1011 @@
+/*
+ * landing.css — the design system for `/` (the LAEC CBT portal gateway).
+ *
+ * WHY THIS FILE EXISTS
+ * --------------------
+ * `/` was rebuilt to the NICEGENE DAILYAPP marketing design, keeping the LAEC
+ * content that used to live on the page. The reference is a Next.js + Tailwind
+ * v4 application; this project is Vue 3 + plain CSS with no utility framework.
+ * Rather than pull Tailwind in for a single route, the reference's resolved
+ * values are transcribed here as ordinary CSS: every colour is the value the
+ * live site computed to, and every length is the value its utility produced.
+ *
+ * The mapping is 1:1 and auditable — the reference utility is named in a
+ * comment above each rule that replaces it, so a value can be checked against
+ * the origin without re-deriving the Tailwind scale.
+ *
+ * SCOPE
+ * -----
+ * Every rule hangs off `.page-home`, which `src/router/index.ts` puts on
+ * <body> for this route only (D-71 BODY_CLASS). Nothing here can reach
+ * /login/ or /control/, which share the `.surface-glass` surface but keep their
+ * own pages.
+ *
+ * BREAKPOINTS (Tailwind defaults, unchanged)
+ * ------------------------------------------
+ *   sm 40rem/640px   md 48rem/768px   lg 64rem/1024px   xl 80rem/1280px
+ *
+ * The reference container is a bare `max-w-[1200px]`, which is 1200px — not
+ * Tailwind's `max-w-7xl` (80rem). The value is written literally.
+ */
+
+/* ── §1 palette ──────────────────────────────────────────────────────────────
+ * Transcribed from the reference's compiled custom properties. The reference
+ * names these `ink` / `gold` / `paper` / `text-*`; they are prefixed `landing-`
+ * here so they cannot collide with the existing --laec-* surface tokens in
+ * glass.css and enterprise.css, which serve the untouched pages.
+ *
+ *   ink             #005997  primary blue: header, hero, "how" and contact
+ *   ink-deep        #0e1a2b  primary button label
+ *   line-on-ink     #2c3e58  hairlines on ink, secondary button border
+ *   gold            #c9a24b  accent: primary button, step numerals, rules
+ *   gold-soft       #e9dbae  accent hover, brand sub-line
+ *   text-hi         #f2efe6  headline copy on ink
+ *   text-mid        #aebccf  body copy on ink
+ *   paper           #f7f4ec  card fill
+ *   paper-2         #f1ecdf  section fill behind the cards
+ *   paper-line      #ded7c4  card grid hairlines on paper
+ *   text-on-paper   #16263d  headline copy on paper
+ *   text-on-paper-mid #5b6b7f  body copy on paper
+ */
+.surface-glass.page-home {
+  --landing-ink: #005997;
+  --landing-ink-deep: #0e1a2b;
+  --landing-line-on-ink: #2c3e58;
+  --landing-gold: #c9a24b;
+  --landing-gold-soft: #e9dbae;
+  --landing-text-hi: #f2efe6;
+  --landing-text-mid: #aebccf;
+  --landing-paper: #f7f4ec;
+  --landing-paper-2: #f1ecdf;
+  --landing-paper-line: #ded7c4;
+  --landing-text-on-paper: #16263d;
+  --landing-text-on-paper-mid: #5b6b7f;
+
+  /* `font-display` in the reference. The reference loads Fraunces as a
+     variable font and sets `font-optical-sizing: auto`, so the `opsz` axis is
+     part of the design, not an optimisation — dropping it changes the shapes. */
+  --landing-display: 'Fraunces', ui-serif, Georgia, Cambria, 'Times New Roman',
+    Times, serif;
+}
+
+/* The display face, wherever the reference used `font-display`. */
+.landing-display {
+  font-family: var(--landing-display);
+  font-optical-sizing: auto;
+}
+
+/* ── §2 preflight equivalent ─────────────────────────────────────────────────
+ * The reference is Tailwind v4, whose preflight zeroes every margin and sets
+ * `box-sizing: border-box` document-wide. This project has no preflight, and
+ * the UA sheet would otherwise supply an 8px body margin and default h1..h3
+ * sizes/margins — so the subset the layout actually depends on is reproduced
+ * here, scoped to this page.
+ */
+.page-home,
+.page-home *,
+.page-home *::before,
+.page-home *::after {
+  box-sizing: border-box;
+}
+
+.page-home :where(h1, h2, h3, h4, p, figure, blockquote, ul, ol, dl, dd) {
+  margin: 0;
+}
+
+.page-home :where(a) {
+  color: inherit;
+}
+
+.page-home :where(button) {
+  font: inherit;
+  color: inherit;
+}
+
+/* The reference sets `antialiased` on <html>. It changes stroke weight
+   materially at 76px, so it is part of the look rather than a nicety. */
+body.surface-glass.page-home {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tailwind's type scale — the sizes this design uses, and the line-heights its
+ * v4 `text-*` utilities resolve to. In v4 a size utility sets BOTH `font-size`
+ * and `line-height: var(--tw-leading, <size default>)`, and the default is the
+ * size's own declared leading, not 1.2/1.25:
+ *
+ *   text-lg   1.125rem  line-height calc(1.75 / 1.125) = 1.5556  -> 28px
+ *   text-base 1rem      line-height calc(1.5  / 1)     = 1.5     -> 24px
+ *   text-sm   0.875rem  line-height calc(1.25 / 0.875) = 1.4286  -> 20px
+ *   text-xs   0.75rem   line-height calc(1    / 0.75)  = 1.3333  -> 16px
+ *
+ * `--tw-leading` is a registered property with `inherits: false`, so a
+ * `leading-*` on an ANCESTOR does not reach a child's `text-*` — the child's
+ * size default wins. That is why `.landing-brand-title` below is 1.5556 and not
+ * 1, even though its parent is `leading-none`.
+ *
+ * An explicit `leading-*` on the SAME element still wins, because it sets
+ * `--tw-leading` there. That is how the 1.04 / 1.25 / 1.375 / 1.625 values
+ * further down are applied.
+ */
+
+/* ── §3 the shared container ──────────────────────────────────────────────────
+ * `mx-auto w-full max-w-[1200px] px-6 sm:px-8 lg:px-12`, with the section
+ * variants carrying `py-16 md:py-24` (see §5) or `py-12` (see §11).
+ */
+.landing-container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 24px; /* px-6 */
+}
+
+@media (min-width: 640px) {
+  .landing-container {
+    padding-inline: 32px; /* sm:px-8 */
+  }
+}
+
+@media (min-width: 1024px) {
+  .landing-container {
+    padding-inline: 48px; /* lg:px-12 */
+  }
+}
+
+/* ── §4 buttons ──────────────────────────────────────────────────────────────
+ * `.landing-btn` in the reference: `px-5 py-3 text-sm font-medium`, 2px radius,
+ * inline-flex and centred, transitioning background/border/transform/colour.
+ * The 2px radius is deliberate — it is the one place the design departs from
+ * the softer corners elsewhere.
+ */
+.landing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px; /* py-3 px-5 */
+  font-size: 14px; /* text-sm */
+  font-weight: 500;
+  line-height: 1.4286; /* see §2 */
+  border-radius: 2px;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.2s,
+    color 0.2s;
+}
+
+.landing-btn-primary {
+  color: var(--landing-ink-deep);
+  background-color: var(--landing-gold);
+}
+
+.landing-btn-primary:hover {
+  background-color: var(--landing-gold-soft);
+  transform: translateY(-1px);
+}
+
+.landing-btn-secondary {
+  border: 1px solid var(--landing-line-on-ink);
+  color: var(--landing-text-hi);
+  background: none;
+}
+
+.landing-btn-secondary:hover {
+  color: var(--landing-gold-soft);
+  border-color: #223149;
+}
+
+/* ── §5 header ───────────────────────────────────────────────────────────────
+ * `sticky top-0 z-50 border-b border-line-on-ink bg-ink`, holding a
+ * `px-6 py-5 sm:px-8 lg:px-12` bar. The logo is 80px square at an 8px radius,
+ * which is what fixes the header at 20 + 80 + 20 + 1px border = 121px.
+ */
+.landing-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-topbar);
+  background-color: var(--landing-ink);
+  border-bottom: 1px solid var(--landing-line-on-ink);
+}
+
+.landing-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 20px 24px; /* py-5 px-6 */
+}
+
+@media (min-width: 640px) {
+  .landing-header-bar {
+    padding-inline: 32px; /* sm:px-8 */
+  }
+}
+
+@media (min-width: 1024px) {
+  .landing-header-bar {
+    padding-inline: 48px; /* lg:px-12 */
+  }
+}
+
+/* `flex items-center gap-3` */
+.landing-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+/*
+ * The 80×80 mark box, which is what fixes the header at
+ * 20 + 80 + 20 + 1px border = 121px. `size-20` in the reference, and it was
+ * sized for a square photograph.
+ *
+ * `contain`, not `cover`, and no radius — the LAEC crest is 407×507, so it is
+ * portrait, and `cover` would crop the top and bottom of the radiating gold
+ * rays, which is the crest's whole character. `contain` keeps the 80×80 box
+ * (and the header height) while showing the mark whole, at 64×80.
+ *
+ * The reference's `rounded-lg` rounded a square photo tile. This mark has a
+ * transparent background and an organic outline, so a radius on the box would
+ * round empty space and is omitted.
+ */
+.landing-brand-mark {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* `flex flex-col leading-none` */
+.landing-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+/* `font-display text-lg font-semibold text-text-hi` — 1.5556 = 28px (see §2) */
+.landing-brand-title {
+  font-family: var(--landing-display);
+  font-optical-sizing: auto;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.5556;
+  color: var(--landing-text-hi);
+}
+
+/* `mt-1 text-xs text-gold-soft` — 1.3333 = 16px (see §2) */
+.landing-brand-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.3333;
+  color: var(--landing-gold-soft);
+}
+
+/* `hidden items-center gap-8 lg:flex` */
+.landing-header-end {
+  display: none;
+  align-items: center;
+  gap: 32px;
+}
+
+@media (min-width: 1024px) {
+  .landing-header-end {
+    display: flex;
+  }
+}
+
+/* `flex items-center gap-8` */
+.landing-header-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+/* `text-sm text-text-mid transition-colors hover:text-text-hi` */
+.landing-header-link {
+  font-size: 14px;
+  line-height: 1.4286; /* see §2 */
+  color: var(--landing-text-mid);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.landing-header-link:hover {
+  color: var(--landing-text-hi);
+}
+
+/* `border border-gold px-4 py-2 text-sm text-gold` + hover to gold-soft */
+.landing-header-signin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border: 1px solid var(--landing-gold);
+  font-size: 14px;
+  line-height: 1.4286; /* see §2 */
+  color: var(--landing-gold);
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.landing-header-signin:hover {
+  border-color: var(--landing-gold-soft);
+  color: var(--landing-gold-soft);
+}
+
+/* `p-2 text-text-mid lg:hidden` */
+.landing-menu-toggle {
+  display: block;
+  padding: 8px;
+  color: var(--landing-text-mid);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.landing-menu-toggle:hover {
+  color: var(--landing-text-hi);
+}
+
+@media (min-width: 1024px) {
+  .landing-menu-toggle {
+    display: none;
+  }
+}
+
+.landing-menu-icon {
+  width: 24px; /* size-6 */
+  height: 24px;
+}
+
+/* `border-t border-line-on-ink bg-ink px-6 pb-6 pt-2 lg:hidden` */
+.landing-mobile-menu {
+  padding: 8px 24px 24px;
+  background-color: var(--landing-ink);
+  border-top: 1px solid var(--landing-line-on-ink);
+}
+
+@media (min-width: 1024px) {
+  .landing-mobile-menu {
+    display: none;
+  }
+}
+
+/* `flex flex-col gap-1` */
+.landing-mobile-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* `py-2 text-sm text-text-mid transition-colors hover:text-text-hi` */
+.landing-mobile-link {
+  display: block;
+  padding: 8px 0;
+  font-size: 14px;
+  line-height: 1.4286; /* see §2 */
+  color: var(--landing-text-mid);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.landing-mobile-link:hover {
+  color: var(--landing-text-hi);
+}
+
+/* The reference offsets the mobile sign-in with `mt-3`. */
+.landing-mobile-menu .landing-header-signin {
+  margin-top: 12px;
+}
+
+/* ── §6 hero ─────────────────────────────────────────────────────────────────
+ * `relative overflow-hidden bg-ink` holding a two-frame crossfade under two
+ * stacked scrims, then a centred `px-6 pt-[100px] pb-[40px] lg:pb-[96px]`
+ * content column. The `overflow: hidden` is load-bearing: it clips the frames
+ * to the section so the `inset: 0` media layer never leaks into the header.
+ */
+.landing-hero {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--landing-ink);
+}
+
+.landing-hero-media {
+  position: absolute;
+  inset: 0;
+}
+
+/* Next's `fill` + `object-cover`, i.e. a pinned, cover-fitted frame. */
+.landing-hero-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 1000ms;
+}
+
+/*
+ * The frames are unpainted until one has decoded, at which point
+ * `.landing-hero-media` carries `data-loaded` and only the current frame
+ * reaches full opacity. The photograph is a remote URL this project does not
+ * control, so a dead or blocked request must fall back to the section's own ink
+ * field rather than park a broken-image glyph across the hero. The view sets
+ * `data-loaded` on either `load` or `error`, so one good frame is enough.
+ */
+.landing-hero-frame {
+  opacity: 0;
+}
+
+.landing-hero-media[data-loaded] .landing-hero-frame--visible {
+  opacity: 1;
+}
+
+/* `from-ink/40 via-ink/25 to-ink/10` — the horizontal wash. */
+.landing-hero-scrim-x {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    to right,
+    rgba(0, 89, 151, 0.4),
+    rgba(0, 89, 151, 0.25),
+    rgba(0, 89, 151, 0.1)
+  );
+}
+
+/* `from-ink/30 via-transparent to-ink/20` — the vertical wash. */
+.landing-hero-scrim-y {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    to top,
+    rgba(0, 89, 151, 0.3),
+    rgba(0, 89, 151, 0),
+    rgba(0, 89, 151, 0.2)
+  );
+}
+
+/*
+ * `relative z-10` in the reference. Mapped onto the project's stacking
+ * contract (D-74) rather than a bare 10: --z-content is the declared value for
+ * content above ambient decoration, which is what this is.
+ */
+.landing-hero-content {
+  position: relative;
+  z-index: var(--z-content);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 100px 24px 40px; /* pt-[100px] pb-[40px] px-6 */
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .landing-hero-content {
+    padding-inline: 32px; /* sm:px-8 */
+  }
+}
+
+@media (min-width: 1024px) {
+  .landing-hero-content {
+    padding-inline: 48px; /* lg:px-12 */
+    padding-bottom: 96px; /* lg:pb-[96px] */
+  }
+}
+
+/* `landing-hero-fade flex max-w-[760px] flex-col items-center` */
+.landing-hero-fade {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 760px;
+  animation: landing-hero-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes landing-hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The reference does not disable this under prefers-reduced-motion; the
+   entrance is 0.9s and non-essential, so it is left as authored. */
+
+/*
+ * `font-display text-[42px] font-semibold uppercase leading-[1.04]
+ *  tracking-tight text-text-hi lg:text-[76px]`
+ * tracking-tight is -0.025em, which is the -1.9px the reference computes at
+ * the 76px desktop size.
+ */
+.landing-hero-title {
+  font-family: var(--landing-display);
+  font-optical-sizing: auto;
+  font-size: 42px;
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+  color: var(--landing-text-hi);
+}
+
+@media (min-width: 1024px) {
+  .landing-hero-title {
+    font-size: 76px;
+  }
+}
+
+/* `text-[34px] lg:text-[56px]` on an inline span inside the h1. */
+.landing-hero-title-sub {
+  font-size: 34px;
+}
+
+@media (min-width: 1024px) {
+  .landing-hero-title-sub {
+    font-size: 56px;
+  }
+}
+
+/* `mt-6 max-w-[640px] text-lg font-semibold leading-relaxed text-white` */
+.landing-hero-lead {
+  max-width: 640px;
+  margin-top: 24px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.625;
+  color: #fff;
+}
+
+/* `mt-9 flex flex-wrap justify-center gap-3` */
+.landing-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 36px;
+}
+
+/* `mt-9 border-l-4 border-gold pl-5 text-sm font-medium leading-relaxed
+ *  text-text-mid` — the gold-ruled pull quote under the hero. */
+.landing-hero-note {
+  margin-top: 36px;
+  padding-left: 20px;
+  border-left: 4px solid var(--landing-gold);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.625;
+  color: var(--landing-text-mid);
+}
+
+/* ── §7 sections ─────────────────────────────────────────────────────────────
+ * `scroll-mt-24` on every anchored section: 96px of scroll margin so a
+ * fragment link clears the 121px sticky header.
+ */
+.landing-section {
+  scroll-margin-top: 96px; /* scroll-mt-24 */
+}
+
+.landing-section--paper {
+  background-color: var(--landing-paper-2); /* bg-paper-2 */
+}
+
+.landing-section--ink {
+  background-color: var(--landing-ink); /* bg-ink */
+}
+
+/* `py-16 md:py-24` */
+.landing-section-inner {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 64px 24px; /* py-16 px-6 */
+}
+
+@media (min-width: 640px) {
+  .landing-section-inner {
+    padding-inline: 32px; /* sm:px-8 */
+  }
+}
+
+@media (min-width: 768px) {
+  .landing-section-inner {
+    padding-block: 96px; /* md:py-24 */
+  }
+}
+
+@media (min-width: 1024px) {
+  .landing-section-inner {
+    padding-inline: 48px; /* lg:px-12 */
+  }
+}
+
+/*
+ * `flex flex-col gap-6 border-b border-paper-line pb-9
+ *  md:flex-row md:items-end md:justify-between`
+ * The "how it works" section replaces the border colour with the ink variant
+ * and drops the two-column arrangement, which is why the head is a component
+ * rather than a section-level style.
+ */
+.landing-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 24px; /* gap-6 */
+  padding-bottom: 36px; /* pb-9 */
+  border-bottom: 1px solid var(--landing-paper-line);
+}
+
+@media (min-width: 768px) {
+  .landing-section-head {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+}
+
+.landing-section-head--ink {
+  border-bottom-color: var(--landing-line-on-ink);
+}
+
+/* `max-w-[560px] font-display text-[34px] leading-tight font-medium
+ *  text-text-on-paper` — 1.25 leading gives the 42.5px the reference computes. */
+.landing-section-title {
+  max-width: 560px;
+  font-family: var(--landing-display);
+  font-optical-sizing: auto;
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--landing-text-on-paper);
+}
+
+/* `max-w-[340px] text-[15px] leading-relaxed`, on ink and on paper */
+.landing-section-lead {
+  max-width: 340px;
+  font-size: 15px;
+  line-height: 1.625;
+  color: var(--landing-text-mid);
+}
+
+.landing-section-lead--paper {
+  color: var(--landing-text-on-paper-mid);
+}
+
+@media (min-width: 768px) {
+  .landing-section-lead--right {
+    text-align: right; /* md:text-right */
+  }
+}
+
+/* ── §8 card grids ───────────────────────────────────────────────────────────
+ * Two related grids share `mt-12 grid border-t border-l border-paper-line`,
+ * the outer edges being drawn by the grid and the inner ones by each cell's
+ * `border-r border-b` — the reference's single-hairline table look. Because
+ * the cells own their right and bottom edges, the last column and last row
+ * would double up at the container edge; they are cancelled below, which is
+ * what the reference's `border-r border-b` + parent `border-l border-t`
+ * pairing achieves in the DOM without an extra rule.
+ */
+.landing-card-grid {
+  display: grid;
+  margin-top: 48px; /* mt-12 */
+  border-top: 1px solid var(--landing-paper-line);
+  border-left: 1px solid var(--landing-paper-line);
+}
+
+@media (min-width: 640px) {
+  .landing-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* sm:grid-cols-2 */
+  }
+}
+
+@media (min-width: 1024px) {
+  .landing-card-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)); /* lg:grid-cols-4 */
+  }
+}
+
+/* `relative border-r border-b border-paper-line bg-paper p-6` */
+.landing-card {
+  position: relative;
+  padding: 24px; /* p-6 */
+  background-color: var(--landing-paper);
+  border-right: 1px solid var(--landing-paper-line);
+  border-bottom: 1px solid var(--landing-paper-line);
+}
+
+/* The portal cards use `p-7` and drop `relative`. */
+.landing-card--portal {
+  display: flex;
+  flex-direction: column;
+  padding: 28px; /* p-7 */
+}
+
+/* `font-display text-[17px] leading-snug font-medium` — 1.375 leading gives
+ * the 23.375px the reference computes at 17px. */
+.landing-card-title {
+  font-family: var(--landing-display);
+  font-optical-sizing: auto;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.375;
+  color: var(--landing-text-on-paper);
+}
+
+/* The portal cards step up to 18px. */
+.landing-card--portal .landing-card-title {
+  font-size: 18px;
+}
+
+/* `mt-2.5 text-[13.5px] leading-relaxed` */
+.landing-card-text {
+  margin-top: 10px; /* mt-2.5 */
+  font-size: 13.5px;
+  line-height: 1.625;
+  color: var(--landing-text-on-paper-mid);
+}
+
+/* `mt-5 text-sm font-medium text-gold underline underline-offset-4
+ *  decoration-gold` */
+.landing-card-link {
+  margin-top: 20px; /* mt-5 */
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4286; /* see §2 */
+  color: var(--landing-gold);
+  text-decoration: underline;
+  text-decoration-color: var(--landing-gold);
+  text-underline-offset: 4px;
+}
+
+.landing-card-link:hover {
+  color: var(--landing-ink);
+}
+
+/*
+ * A cell with no content, present only to finish the outline of a short last
+ * row. See the view for why the shortfall is emitted per column state.
+ *
+ * It carries the same fill and right/bottom hairlines as a card and no padding,
+ * and the grid's `align-content: stretch` default gives it the height of the
+ * row beside it. It is `aria-hidden` and holds no text.
+ */
+.landing-card-filler {
+  display: none;
+  background-color: var(--landing-paper);
+  border-right: 1px solid var(--landing-paper-line);
+  border-bottom: 1px solid var(--landing-paper-line);
+}
+
+@media (min-width: 640px) {
+  .landing-card-filler--sm {
+    display: block;
+  }
+}
+
+@media (min-width: 1024px) {
+  .landing-card-filler--lg {
+    display: block;
+  }
+}
+
+/* ── §9 how it works ─────────────────────────────────────────────────────────
+ * The 64px hairline grid is drawn by a pseudo-element over the ink field at 7%
+ * opacity; the step separators are a 1px `gap` showing the grid's own
+ * background through, rather than borders on the cells.
+ */
+.landing-grid-texture {
+  position: relative;
+}
+
+.landing-grid-texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  background-size: 64px 64px;
+  background-image: linear-gradient(
+      to right,
+      var(--landing-line-on-ink) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, var(--landing-line-on-ink) 1px, transparent 1px);
+}
+
+/*
+ * `flex border-b border-line-on-ink pb-9` — the ink section head is a single
+ * left-aligned line, not the paper section's two-column head.
+ */
+.landing-how-head {
+  display: flex;
+  padding-bottom: 36px; /* pb-9 */
+  border-bottom: 1px solid var(--landing-line-on-ink);
+}
+
+/* `mt-12 grid gap-px bg-line-on-ink` */
+.landing-step-grid {
+  display: grid;
+  gap: 1px; /* gap-px */
+  margin-top: 48px; /* mt-12 */
+  background-color: var(--landing-line-on-ink);
+}
+
+@media (min-width: 640px) {
+  .landing-step-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .landing-step-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* `bg-ink p-7` */
+.landing-step {
+  padding: 28px; /* p-7 */
+  background-color: var(--landing-ink);
+}
+
+/* `block font-display text-[56px] leading-none font-medium text-gold` */
+.landing-step-number {
+  display: block;
+  font-family: var(--landing-display);
+  font-optical-sizing: auto;
+  font-size: 56px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--landing-gold);
+}
+
+/* `mt-5 font-display text-[17px] leading-snug font-medium text-text-hi` */
+.landing-step-title {
+  margin-top: 20px; /* mt-5 */
+  font-family: var(--landing-display);
+  font-optical-sizing: auto;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.375;
+  color: var(--landing-text-hi);
+}
+
+/* `mt-2.5 text-[13.5px] leading-relaxed text-text-mid` */
+.landing-step-text {
+  margin-top: 10px; /* mt-2.5 */
+  font-size: 13.5px;
+  line-height: 1.625;
+  color: var(--landing-text-mid);
+}
+
+/* ── §10 contact ─────────────────────────────────────────────────────────────
+ * `grid gap-14 lg:grid-cols-2 lg:items-center lg:gap-20`
+ */
+.landing-contact-grid {
+  display: grid;
+  gap: 56px; /* gap-14 */
+}
+
+@media (min-width: 1024px) {
+  .landing-contact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 80px; /* lg:gap-20 */
+  }
+}
+
+/* `font-display text-[30px] leading-tight font-medium text-text-hi` */
+.landing-contact-name {
+  font-family: var(--landing-display);
+  font-optical-sizing: auto;
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--landing-text-hi);
+}
+
+/* `mt-6 max-w-[520px] text-[15px] leading-relaxed text-text-mid` */
+.landing-contact-text {
+  max-width: 520px;
+  margin-top: 24px;
+  font-size: 15px;
+  line-height: 1.625;
+  color: var(--landing-text-mid);
+}
+
+/* `flex flex-col gap-8` */
+.landing-contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* `flex flex-col gap-1.5` */
+.landing-contact-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* `text-sm text-text-mid` */
+.landing-contact-label {
+  font-size: 14px;
+  line-height: 1.4286; /* see §2 */
+  color: var(--landing-text-mid);
+}
+
+/* `text-[15px] font-semibold text-text-hi` */
+.landing-contact-value {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--landing-text-hi);
+}
+
+/* `mt-16 flex justify-center` */
+.landing-contact-cta {
+  display: flex;
+  justify-content: center;
+  margin-top: 64px; /* mt-16 */
+}
+
+/* ── §11 footer ──────────────────────────────────────────────────────────────
+ * `border-t border-line-on-ink bg-ink` over a `py-12` bar holding a single
+ * wrapping row.
+ */
+.landing-footer {
+  background-color: var(--landing-ink);
+  border-top: 1px solid var(--landing-line-on-ink);
+}
+
+.landing-footer-inner {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 48px 24px; /* py-12 px-6 */
+}
+
+@media (min-width: 640px) {
+  .landing-footer-inner {
+    padding-inline: 32px; /* sm:px-8 */
+  }
+}
+
+@media (min-width: 1024px) {
+  .landing-footer-inner {
+    padding-inline: 48px; /* lg:px-12 */
+  }
+}
+
+/* `flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm
+ *  text-text-mid` */
+.landing-footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px; /* gap-y-2 gap-x-4 */
+  font-size: 14px;
+  line-height: 1.4286; /* see §2 */
+  color: var(--landing-text-mid);
+}
+
+.landing-footer-link {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.landing-footer-link:hover {
+  color: var(--landing-text-hi);
+}

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- LAEC crest. D-13 originally pointed this at the unserved /laec%20logo.png
+         (a deliberate 404) or at nicegene_logo.png; reversed by client instruction
+         2026-10-02 so every page carries the real mark. -->
+    <link rel="icon" href="/laec-crest.png" type="image/png" />
+    <title>LAEC | Central Office</title>
+    <!--
+      Role-scoped door (2026-10-02). The extra page-control-door class lets
+      the door switcher sit under the auth card; see styles/glass.css.
+      Body classes are re-applied by the router on every navigation
+      (BODY_CLASS in src/router/index.ts), so this is the load-time value.
+    -->
+    <script src="/config.js"></script>
+  </head>
+  <body class="surface-glass page-control page-control-door">
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

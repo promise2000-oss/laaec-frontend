@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAEC | Secure Examination Hall</title>
+    <link rel="icon" href="/laec%20logo.png" type="image/png">
+    
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1555.0.min.js"></script>
+    <script src="/config.js"></script>
+    
+    <style>
+        :root { 
+            --laec-blue: #004a99; 
+            --nj-dark: #2c3e50; 
+            --nj-bg: #f4f7f6; 
+            --nj-success: #27ae60; 
+            --nj-border: #dee2e6; 
+            --nj-danger: #d32f2f; 
+            --nj-warning: #f39c12;
+        }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: var(--nj-bg); 
+            margin: 0; 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+            user-select: none; 
+        }
+
+        .hidden { display: none !important; }
+
+        .rules-list { 
+            list-style: none; 
+            padding: 0; 
+            margin: 10px 0;
+        }
+
+        .rules-list li { 
+            position: relative;
+            padding-left: 25px;
+            margin-bottom: 12px; 
+            line-height: 1.4; 
+            color: #444; 
+            font-size: 14px;
+        }
+
+        .rules-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--laec-blue);
+            font-weight: bold;
+        }
+
+        .security-banner { 
+            background: var(--nj-danger); 
+            color: white; 
+            padding: 10px; 
+            text-align: center; 
+            font-size: 0.85rem; 
+            font-weight: 800; 
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border-bottom: 3px solid #000;
+        }
+
+        header { 
+            background: var(--laec-blue); color: white; padding: 10px 20px; 
+            display: flex; justify-content: space-between; align-items: center; 
+            position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .timer-box { 
+            font-family: monospace; 
+            background: #000; 
+            padding: 8px 15px; 
+            border-radius: 5px; 
+            font-weight: bold; 
+            font-size: 1.4rem; 
+            color: #ff0; 
+            border: 2px solid white;
+            transition: 0.3s;
+        }
+
+        .timer-box.offline {
+            color: var(--nj-warning);
+            border-color: var(--nj-warning);
+        }
+
+        .start-overlay { position: fixed; inset: 0; background: white; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+        .instruction-card { 
+            background:#f9f9f9; padding: 20px; border-radius: 12px; margin: 15px 0; 
+            max-width: 550px; width: 100%; text-align: left; border: 1px solid #ddd;
+            max-height: 60vh; overflow-y: auto; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .instruction-card::-webkit-scrollbar { width: 8px; }
+        .instruction-card::-webkit-scrollbar-track { background: #eee; border-radius: 10px; }
+        .instruction-card::-webkit-scrollbar-thumb { background: var(--laec-blue); border-radius: 10px; }
+
+        .main-wrapper { 
+            display: flex; flex-direction: row; max-width: 1200px; width: 95%; margin: 15px auto; gap: 20px; flex: 1;
+        }
+
+        .sidebar { 
+            width: 280px; background: white; padding: 20px; border-radius: 10px; 
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05); height: fit-content;
+            border: 1px solid var(--nj-border);
+        }
+
+        .monitoring-box { text-align: center; margin-bottom: 20px; border-bottom: 2px solid var(--nj-bg); padding-bottom: 15px; }
+        .student-photo-square { width: 180px; height: 180px; object-fit: cover; border: 4px solid var(--laec-blue); border-radius: 8px; background: #eee; }
+        .student-reg-tag { font-weight: bold; color: var(--laec-blue); font-size: 1.1rem; display: block; margin-top: 8px; }
+
+        .palette-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 15px; }
+        .q-box { 
+            height: 35px; display: flex; align-items: center; justify-content: center; 
+            border: 1px solid var(--nj-border); border-radius: 5px; cursor: pointer; 
+            font-weight: bold; transition: 0.3s; background: white; font-size: 0.85rem;
+        }
+        .q-box.current { border: 2.5px solid var(--laec-blue); color: var(--laec-blue); background: #eef5ff; }
+        .q-box.answered { background: var(--nj-success); color: white; border-color: var(--nj-success); }
+        .q-box.theory { background: var(--laec-blue); color: white; }
+
+        .question-container { 
+            flex: 1; background: white; padding: 35px; border-radius: 10px; 
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05); min-height: 450px;
+            display: flex; flex-direction: column; border: 1px solid var(--nj-border);
+        }
+        .q-meta { color: var(--laec-blue); font-weight: 800; margin-bottom: 10px; font-size: 0.9rem; text-transform: uppercase; }
+        .q-text { font-size: 1.4rem; line-height: 1.6; margin-bottom: 30px; color: #333; white-space: pre-wrap; }
+
+        .option-label { 
+            display: flex; align-items: center; padding: 18px; border: 1px solid var(--nj-border); 
+            margin-bottom: 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 1.1rem;
+        }
+        .option-label:hover { background: #f8f9fa; border-color: var(--laec-blue); }
+        .option-label.selected { border-color: var(--laec-blue); background: #eef5ff; font-weight: 600; }
+        .option-label input { margin-right: 15px; width: 20px; height: 20px; }
+        .sub-objective-wrap { display: flex; flex-direction: column; gap: 10px; }
+        .sub-objective-input {
+            width: 100%; max-width: 620px; padding: 16px 18px; border: 1px solid var(--nj-border);
+            border-radius: 8px; font-size: 1.1rem; font-family: inherit; color: #222; background: #fff;
+        }
+        .sub-objective-input:focus { outline: none; border-color: var(--laec-blue); box-shadow: 0 0 0 3px rgba(0,86,179,0.12); }
+        .sub-objective-hint { color: #667085; font-size: 0.9rem; }
+
+        .question-actions-top { display: flex; gap: 15px; margin: 0 0 22px; }
+        .footer-nav { display: flex; align-items: center; margin-top: auto; padding-top: 25px; border-top: 1px solid #eee; }
+        .btn { padding: 12px 28px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.3s; }
+        .btn-prev { background: #eee; color: #555; margin-right: 15px; }
+        .btn-next { background: var(--laec-blue); color: white; }
+        .btn-submit { background: var(--nj-danger); color: white; margin-left: auto; }
+        .btn-start { background: #ccc; color: #777; width: 100%; max-width: 400px; padding: 15px; border-radius: 8px; cursor: not-allowed; border:none; }
+        .btn-start.active-green { background: var(--nj-success) !important; color: white !important; cursor: pointer !important; }
+
+        .theory-notice { background: #fff3cd; border: 2px dashed #856404; color: #856404; padding: 25px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 1.1rem; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 10001; }
+        .modal-box { background: white; padding: 40px; border-radius: 12px; max-width: 450px; width: 90%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .score-display { width: 120px; height: 120px; border-radius: 50%; border: 6px solid var(--nj-success); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; font-weight: bold; color: var(--nj-success); margin: 20px auto; }
+
+        @media (max-width: 900px) {
+            .main-wrapper { flex-direction: column; }
+            .sidebar { width: auto; order: -1; }
+            .palette-grid { grid-template-columns: repeat(10, 1fr); }
+            .question-actions-top { position: sticky; top: 72px; z-index: 20; background: white; padding: 10px 0; border-bottom: 1px solid #eee; }
+            .rules-list li { font-size: 13px; }
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;"><a href="https://www.laaec.com/cdn-cgi/content?id=P54Dy9x4rC9ByzklIXyCoTdR9x71FyxnhlVOEaNv6ZY-1790616965.5688796-1.2.1.1-.UWmknXR4_Dfznv_TaZmzEN5n4vn8qkmHmWKkwDd7hV5vbk083X.HH246pNN8kxn" aria-hidden="true" rel="nofollow noopener" style="display: none !important; visibility: hidden !important"></a>
+
+    <div id="instructionStage" class="start-overlay">
+        <h1 id="instructionTitle" style="color: var(--laec-blue); margin-top:0;">LAEC System Instructions</h1>
+        <div class="instruction-card" id="systemInstructionCard">
+            <p><strong>Strict Rules & Regulations:</strong></p>
+            <ul class="rules-list">
+                <li><strong>AI Proctoring Enabled:</strong> This session is strictly monitored. Your navigation, screen activity, and session duration are logged in real-time.</li>
+                <li><strong>Anti-Cheat Tab Lock:</strong> You are prohibited from switching tabs or minimizing this window. <strong>Any attempt to leave this page will trigger an automatic submission of your exam.</strong></li>
+                <li><strong>Automatic Disqualification:</strong> Leaving the exam environment will result in a flagged status. A disciplinary comment will be appended to your final result for administrators.</li>
+                <li><strong>Single Session Policy:</strong> You cannot access this exam on multiple devices. Detected multi-logins will terminate your session immediately.</li>
+                <li><strong>Timer Control:</strong> Your work will be submitted automatically when the countdown reaches zero. Ensure you keep an eye on the clock.</li>
+                <li><strong>External Materials:</strong> Use of smartphones, smartwatches, or textbooks is strictly forbidden.</li>
+                <li><strong>Full-Screen Mode:</strong> Entering the hall will force your browser into Full-Screen mode to maintain integrity.</li>
+            </ul>
+        </div>
+        <div class="instruction-card hidden" id="assessmentInstructionCard">
+            <p><strong id="assessmentInstructionSubject">Assessment Specific Instruction</strong></p>
+            <div id="assessmentInstructionText" style="white-space: pre-wrap; color:#444; font-size:14px; line-height:1.55;"></div>
+        </div>
+        <div id="agreementArea" class="hidden" style="margin: 10px 0;">
+            <label style="cursor:pointer; display:flex; align-items:center; gap: 10px; max-width: 450px;">
+                <input type="checkbox" id="agreeCheck" style="width:22px; height:22px;" onchange="updateStartButton()">
+                <span style="color:var(--nj-danger); font-weight:bold; font-size: 0.9rem; text-align: left;">I understand that minimizing this window terminates my exam immediately and I accept to obey the exam rules.</span>
+            </label>
+        </div>
+        <button id="nextInstructionBtn" class="btn btn-next" style="width:100%; max-width:400px;" onclick="showAssessmentInstructions()">NEXT</button>
+        <button id="proceedBtn" class="btn btn-start hidden" disabled onclick="engageExtremeSecurity()">Enter Exam Hall</button>
+    </div>
+
+    <div class="security-banner hidden" id="secBanner">
+        LOCKDOWN ACTIVE — DO NOT SWITCH TABS OR MINIMIZE WINDOW
+    </div>
+
+    <header class="header hidden" id="mainHeader">
+        <div style="font-weight: 800; font-size: 1.2rem; letter-spacing: 1px;">LAEC SECURE PORTAL</div>
+        <div id="active-cat-display" style="background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 4px; font-weight: bold; font-size: 0.8rem;">SYNCING...</div>
+        <div class="timer-box" id="timer">00:00:00</div>
+    </header>
+
+    <div class="main-wrapper hidden" id="mainWrapper">
+        <main class="question-container">
+            <div class="q-meta" id="qLabel">Question 0 of 0</div>
+            <div class="question-actions-top">
+                <button class="btn btn-prev" onclick="changeQ(-1)">PREVIOUS</button>
+                <button class="btn btn-next" onclick="changeQ(1)">SAVE & NEXT</button>
+            </div>
+            <div class="q-text" id="qText">Connecting to secure question bank...</div>
+            <div id="diagramArea" style="text-align: center; margin-bottom: 20px;"></div>
+            <div id="optionsArea" class="options-area"></div>
+            <div class="footer-nav">
+                <button class="btn btn-submit" onclick="showConfirm()">SUBMIT EXAM</button>
+            </div>
+        </main>
+
+        <aside class="sidebar">
+            <div class="monitoring-box">
+                <img id="sidebar-photo" class="student-photo-square" src="/nicegene_logo.png">
+                <span id="sidebar-reg" class="student-reg-tag">---</span>
+                <span id="sidebar-name" style="font-size: 13px; color: #666; text-transform: uppercase; font-weight: 700;">Student Name</span>
+            </div>
+            <h4 style="margin: 0 0 10px; font-size: 0.8rem; color: #888;">QUESTION NAVIGATOR</h4>
+            <div class="palette-grid" id="palette"></div>
+        </aside>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-box">
+            <h2 id="modalTitle">End Session?</h2>
+            <p id="modalMsg">Are you sure you want to submit your exam now?</p>
+            <div id="finalScoreArea" class="hidden">
+                <div class="score-display" id="percentCircle">0%</div>
+                <p id="rawScoreLabel" style="font-weight: bold; color: var(--laec-blue); margin-top: 10px;"></p>
+            </div>
+            <div id="modalActions" style="display:flex; gap:10px; margin-top:30px;">
+                <button class="btn btn-prev" style="flex:1" onclick="closeModal()">CANCEL</button>
+                <button class="btn btn-next" style="flex:1; background: var(--nj-danger);" onclick="processSubmission()">YES, SUBMIT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let questions = [];
+        let curIdx = 0;
+        let answers = {};
+        let timeLeft = 0; 
+        let isSubmitting = false;
+        let activeTestType = "EXAM";
+        let activeAcademicYear = "2025-2026";
+        let activeTerm = "TERM1";
+        let activeSystemMode = "MODE_A";
+        let violationReason = "None";
+        let timerInterval = null;
+        let initialTimeSet = 0; 
+        let assessmentInstruction = "";
+        
+        // NEW: Go-Live Hard Cut-off logic
+        let hardCutOffTime = null;
+        let viewportGuardInterval = null;
+        let inactiveWindowGraceTimer = null;
+        let inactiveWindowGraceInterval = null;
+        let inactiveWindowReason = "";
+        let inactiveWindowSecondsLeft = 0;
+        const INACTIVE_WINDOW_GRACE_SECONDS = 5;
+
+        const LAEC = window.LAEC_UTILS;
+        function renderSafeQuestionHtml(html, fallbackText) {
+            if (LAEC && typeof LAEC.sanitizeRichTextHtml === "function") {
+                return LAEC.sanitizeRichTextHtml(html, fallbackText);
+            }
+            const div = document.createElement('div');
+            div.innerText = fallbackText || "";
+            return div.innerHTML;
+        }
+        let student = null;
+        try {
+            student = JSON.parse(sessionStorage.getItem('activeStudent') || "null");
+        } catch (error) {
+            sessionStorage.removeItem('activeStudent');
+        }
+        const selectedSubject = sessionStorage.getItem('selectedSubject'); 
+
+        if (!student || !selectedSubject) {
+            location.replace("/login/");
+            throw new Error("Missing active exam session.");
+        }
+
+        const storageKey = `ans_${student.RegNo}_${selectedSubject}`;
+        const savedAnswers = localStorage.getItem(storageKey);
+        if (savedAnswers) {
+            try {
+                answers = JSON.parse(savedAnswers);
+                console.log("Power Recovery: Previous progress restored.");
+            } catch (error) {
+                localStorage.removeItem(storageKey);
+                answers = {};
+            }
+        }
+
+        window.addEventListener('online',  () => document.getElementById('timer').classList.remove('offline'));
+        window.addEventListener('offline', () => document.getElementById('timer').classList.add('offline'));
+
+        window.onload = async () => {
+            loadStudentDetails(); 
+            try {
+                await syncExamConfig();
+                await fetchQuestions();
+                
+                if (Object.keys(answers).length > 0) {
+                    renderPalette();
+                }
+            } catch (err) {
+                console.error("Critical System Error:", err);
+                alert("System failed to load secure content. Please login again.");
+                location.replace("/login/");
+            }
+        };
+
+        function loadStudentDetails() {
+            if(!student) return;
+            document.getElementById('sidebar-name').innerText = student.FullName;
+            document.getElementById('sidebar-reg').innerText = student.RegNo;
+            if(student.PassportURL) document.getElementById('sidebar-photo').src = student.PassportURL;
+        }
+
+        function createShuffleSeed(text) {
+            let hash = 2166136261;
+            for (let i = 0; i < text.length; i++) {
+                hash ^= text.charCodeAt(i);
+                hash = Math.imul(hash, 16777619);
+            }
+            return hash >>> 0;
+        }
+
+        function seededRandom(seed) {
+            let value = seed >>> 0;
+            return function () {
+                value += 0x6D2B79F5;
+                let next = value;
+                next = Math.imul(next ^ (next >>> 15), next | 1);
+                next ^= next + Math.imul(next ^ (next >>> 7), next | 61);
+                return ((next ^ (next >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        function isShuffleEnabled(value) {
+            if (value === false || value === 0) return false;
+            if (value === true || value === 1) return true;
+            if (typeof value === "string") {
+                return ["true", "1", "yes", "on"].includes(value.trim().toLowerCase());
+            }
+            return false;
+        }
+
+        function shuffleQuestionsForStudent(questionList) {
+            const paperShuffleValue = questionList.find((question) => Object.prototype.hasOwnProperty.call(question, "ShuffleQuestions"))?.ShuffleQuestions;
+            const shouldShuffle = questionList.length > 0 && isShuffleEnabled(paperShuffleValue);
+            if (!shouldShuffle) return [...questionList];
+
+            const shuffleSessionKey = `shuffle_${student.RegNo}_${selectedSubject}_${activeAcademicYear}_${activeTerm}_${activeTestType}_${activeSystemMode}`;
+            let shuffleSessionID = sessionStorage.getItem(shuffleSessionKey);
+            if (!shuffleSessionID) {
+                shuffleSessionID = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                sessionStorage.setItem(shuffleSessionKey, shuffleSessionID);
+            }
+            const seedText = [
+                student.RegNo,
+                student.FullName,
+                student.SchoolID,
+                student.Class,
+                selectedSubject,
+                activeAcademicYear,
+                activeTerm,
+                activeTestType,
+                activeSystemMode,
+                sessionStorage.getItem('studentSessionID') || shuffleSessionID
+            ].join("|");
+            const random = seededRandom(createShuffleSeed(seedText));
+            const shuffled = [...questionList];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        async function releaseStudentSession() {
+            const sessionID = sessionStorage.getItem('studentSessionID') || "";
+            if (!sessionID || sessionStorage.getItem('studentSessionLocked') !== 'true') return;
+            const schoolID = student.SchoolID || student.RegNo.split('/')[1];
+            await fetch(AWS_CONFIG.registerEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: "END_STUDENT_SESSION",
+                    schoolID,
+                    regNo: student.RegNo,
+                    sessionID
+                })
+            }).catch(() => {});
+            sessionStorage.removeItem('studentSessionLocked');
+        }
+
+        async function syncExamConfig() {
+            const schoolCode = student.RegNo.split('/')[1];
+            const data = await LAEC.fetchJsonWithRetry(`${AWS_CONFIG.getStudentsEndpoint}?action=GET_EXAM_CONFIG&schoolID=${schoolCode}`, {
+                retryLabel: "Exam config sync"
+            });
+
+            if (data.status !== "success" || !data.config) {
+                throw new Error(data.message || "Exam config sync failed.");
+            }
+
+            const hallwayMode = sessionStorage.getItem('currentEffectiveMode');
+            const hallwayCategory = sessionStorage.getItem('currentExamCategory');
+            const hallwayTerm = sessionStorage.getItem('currentExamTerm');
+            const hallwayYear = sessionStorage.getItem('currentExamYear');
+            activeTestType = hallwayCategory || data.config.activeExamType || "EXAM"; 
+            activeTerm = hallwayTerm || data.config.currentTerm || "TERM1";
+            activeSystemMode = (hallwayMode || data.effectiveMode || data.config.currentMode || "MODE_A").toUpperCase();
+            activeAcademicYear = hallwayYear || (data.config.academicYear || "2025/2026").replace('/', '-');
+            
+            // FALLBACK: Global duration in case specific paper has none
+            initialTimeSet = parseInt(data.config.examDuration) || 0;
+            timeLeft = initialTimeSet * 60; 
+            
+            document.getElementById('active-cat-display').innerText = `SESSION: ${activeTestType} (${activeSystemMode})`;
+        }
+
+        function updateStartButton() {
+            const check = document.getElementById('agreeCheck');
+            const btn = document.getElementById('proceedBtn');
+            btn.disabled = !check.checked;
+            btn.classList.toggle('active-green', check.checked);
+        }
+
+        function showAssessmentInstructions() {
+            document.getElementById('instructionTitle').innerText = "Assessment Specific Instruction";
+            document.getElementById('systemInstructionCard').classList.add('hidden');
+            document.getElementById('assessmentInstructionCard').classList.remove('hidden');
+            document.getElementById('agreementArea').classList.remove('hidden');
+            document.getElementById('nextInstructionBtn').classList.add('hidden');
+            document.getElementById('proceedBtn').classList.remove('hidden');
+            document.getElementById('assessmentInstructionSubject').innerText = `${LAEC.humanizeSubject(selectedSubject)} Instruction`;
+            document.getElementById('assessmentInstructionText').innerText = assessmentInstruction || "No additional subject-specific instruction was provided for this paper. Follow all LAEC system rules and answer the questions presented.";
+        }
+
+        async function engageExtremeSecurity() {
+            try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (err) {}
+            document.getElementById('instructionStage').classList.add('hidden');
+            document.getElementById('secBanner').classList.remove('hidden');
+            document.getElementById('mainHeader').classList.remove('hidden');
+            document.getElementById('mainWrapper').classList.remove('hidden');
+            startExam();
+        }
+
+        function startExam() {
+            startTimer();
+            setupLockdown();
+            renderQuestion();
+            renderPalette();
+        }
+
+        async function fetchQuestions() {
+            const schoolCode = student.RegNo.split('/')[1];
+            const yearKey = activeAcademicYear;
+
+            try {
+                const normalizedSubject = LAEC.normalizeSubjectValue(selectedSubject);
+                const normalizedClass = LAEC.normalizeClassValue(student.Class);
+                const { data } = await LAEC.fetchQuestionSet({
+                    baseUrl: AWS_CONFIG.getStudentsEndpoint,
+                    params: {
+                        action: "GET_SECURE_QUESTIONS",
+                        schoolID: schoolCode,
+                        year: yearKey,
+                        term: activeTerm,
+                        class: normalizedClass,
+                        subject: normalizedSubject,
+                        type: activeTestType,
+                        mode: activeSystemMode,
+                        regNo: student.RegNo,
+                        noCache: "1"
+                    }
+                });
+                if (data.status !== "success") {
+                    throw new Error(data.message || "Secure subject validation failed.");
+                }
+                let rawQuestions = data.questions || [];
+                
+                if(rawQuestions.length === 0) {
+                    isSubmitting = true;
+                    const modal = document.getElementById('modalOverlay');
+                    modal.style.display = "flex";
+                    document.getElementById('modalTitle').innerText = data.completed ? "SUBJECT LOCKED" : "PAPER NOT FOUND";
+                    document.getElementById('modalMsg').innerText = data.message || `Subject paper for ${LAEC.humanizeSubject(normalizedSubject)} is not yet available.`;
+                    document.getElementById('modalActions').classList.add('hidden');
+                    setTimeout(() => { location.replace("/login/"); }, 6000);
+                } else {
+                    questions = shuffleQuestionsForStudent(rawQuestions);
+
+                    // --- NEW: SYNCHRONIZED LOGIC (Paper-Specific Duration) ---
+                    const paper = questions[0];
+                    if (paper.DurationMinutes) {
+                        const specificMinutes = parseFloat(paper.DurationMinutes);
+                        console.log(`System: Applying Paper-Specific Timer of ${specificMinutes} minutes.`);
+                        timeLeft = specificMinutes * 60;
+                        initialTimeSet = specificMinutes;
+                    }
+
+                    // --- NEW: GO-LIVE HARD CUT-OFF ---
+                    if (paper.EndTime) {
+                        const paperEndTime = new Date(paper.EndTime).getTime();
+                        hardCutOffTime = Number.isFinite(paperEndTime) && Date.now() < paperEndTime ? paperEndTime : null;
+                    }
+
+                    assessmentInstruction = paper.AssessmentInstruction || paper.Instruction || paper.Instructions || "";
+
+                    renderQuestion();
+                    renderPalette();
+                }
+            } catch (e) {
+                document.getElementById('qText').innerText = "Error loading secure data.";
+                throw e;
+            }
+        }
+
+        function renderQuestion() {
+            if(!questions[curIdx]) return;
+            const q = questions[curIdx];
+            document.getElementById('qLabel').innerText = `Question ${curIdx + 1} of ${questions.length}`;
+            document.getElementById('qText').innerHTML = renderSafeQuestionHtml(q.QuestionHTML || q.TextHTML, q.Question || q.Text);
+            
+            const diagramArea = document.getElementById('diagramArea');
+            diagramArea.innerHTML = ""; 
+            if (q.ImageURL && q.ImageURL.trim() !== "") {
+                diagramArea.innerHTML = `<img src="${q.ImageURL}" style="max-width:100%; max-height:300px; border: 2px solid var(--laec-blue); border-radius: 10px;" onerror="this.style.display='none'">`;
+            }
+
+            const area = document.getElementById('optionsArea');
+            area.innerHTML = "";
+            if (q.QuestionType === "THEORY") {
+                area.innerHTML = `<div class="theory-notice">THEORY QUESTION<br>Provide answer in your Physical Booklet.</div>`;
+                if (!answers[curIdx]) answers[curIdx] = "THEORY_READ"; 
+            } else if (q.QuestionType === "SUB_OBJECTIVE") {
+                const wrap = document.createElement('div');
+                wrap.className = 'sub-objective-wrap';
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'sub-objective-input';
+                input.maxLength = 120;
+                input.autocomplete = 'off';
+                input.autocapitalize = 'off';
+                input.spellcheck = false;
+                input.placeholder = 'Type your answer';
+                input.value = sanitizeSubObjectiveAnswer(answers[curIdx] || "");
+                input.addEventListener('input', function () {
+                    saveSubObjectiveAnswer(this.value);
+                });
+
+                const hint = document.createElement('div');
+                hint.className = 'sub-objective-hint';
+                hint.textContent = 'Use | only when you need to enter more than one possible answer.';
+
+                wrap.appendChild(input);
+                wrap.appendChild(hint);
+                area.appendChild(wrap);
+            } else {
+                ['A','B','C','D'].forEach(letter => {
+                    if(!q[letter]) return;
+                    const label = document.createElement('label');
+                    label.className = `option-label ${answers[curIdx] === letter ? 'selected' : ''}`;
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = 'opt';
+                    radio.checked = answers[curIdx] === letter;
+                    radio.addEventListener('change', function () {
+                        saveAnswer(letter, this);
+                    });
+                    const optionLetter = document.createElement('b');
+                    optionLetter.textContent = `${letter}.`;
+                    const optionText = document.createElement('span');
+                    optionText.innerHTML = ` ${renderSafeQuestionHtml(q[`${letter}HTML`], q[letter])}`;
+                    label.appendChild(radio);
+                    label.appendChild(optionLetter);
+                    label.appendChild(document.createTextNode('  '));
+                    label.appendChild(optionText);
+                    area.appendChild(label);
+                });
+            }
+        }
+
+        async function saveAnswer(val, inputEl) {
+            answers[curIdx] = val;
+            localStorage.setItem(`ans_${student.RegNo}_${selectedSubject}`, JSON.stringify(answers));
+            renderPalette();
+            const labels = document.querySelectorAll('.option-label');
+            labels.forEach(l => l.classList.remove('selected'));
+            if (inputEl && inputEl.closest('label')) {
+                inputEl.closest('label').classList.add('selected');
+            }
+        }
+
+        function sanitizeSubObjectiveAnswer(value) {
+            return String(value || "")
+                .replace(/[\u0000-\u001F\u007F]/g, " ")
+                .replace(/[<>]/g, "")
+                .replace(/\s+/g, " ")
+                .trim()
+                .slice(0, 120);
+        }
+
+        function normalizeSubObjectiveAnswer(value) {
+            const upperValue = sanitizeSubObjectiveAnswer(value).toUpperCase();
+            let normalized = "";
+            for (const char of upperValue) {
+                const isLetter = char.toLowerCase() !== char.toUpperCase();
+                const isNumber = char >= "0" && char <= "9";
+                if (isLetter || isNumber || char === "|" || char === " ") {
+                    normalized += char;
+                }
+            }
+            return normalized
+                .replace(/\s*\|\s*/g, "|")
+                .replace(/\s+/g, " ")
+                .trim();
+        }
+
+        function splitSubObjectiveAnswers(value) {
+            return normalizeSubObjectiveAnswer(value)
+                .split("|")
+                .map(part => part.trim())
+                .filter(Boolean)
+                .slice(0, 10);
+        }
+
+        function isSubObjectiveCorrect(studentValue, correctValue) {
+            const studentParts = splitSubObjectiveAnswers(studentValue);
+            const acceptedParts = new Set(splitSubObjectiveAnswers(correctValue));
+            return studentParts.length > 0 && acceptedParts.size > 0 && studentParts.every(part => acceptedParts.has(part));
+        }
+
+        function saveSubObjectiveAnswer(value) {
+            answers[curIdx] = sanitizeSubObjectiveAnswer(value);
+            localStorage.setItem(`ans_${student.RegNo}_${selectedSubject}`, JSON.stringify(answers));
+            renderPalette();
+        }
+
+        function renderPalette() {
+            const pal = document.getElementById('palette');
+            pal.innerHTML = questions.map((q, i) => {
+                let cls = i === curIdx ? 'current' : '';
+                if(answers[i]) cls += ' answered';
+                if(q.QuestionType === 'THEORY') cls += ' theory';
+                return `<div class="q-box ${cls}" onclick="jumpTo(${i})">${i+1}</div>`;
+            }).join('');
+        }
+
+        function changeQ(dir) { let n = curIdx + dir; if(n >= 0 && n < questions.length) { curIdx = n; renderQuestion(); renderPalette(); } }
+        function jumpTo(i) { curIdx = i; renderQuestion(); renderPalette(); }
+
+        function startTimer() {
+            if(timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                // 1. Check Hard Cut-off (Go-Live Window End)
+                if (hardCutOffTime) {
+                    const now = new Date().getTime();
+                    if (now >= hardCutOffTime) {
+                        clearInterval(timerInterval);
+                        autoTerminate("Exam Window Closed");
+                        return;
+                    }
+                }
+
+                // 2. Standard Countdown Logic
+                if (initialTimeSet > 0) {
+                    timeLeft--;
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        violationReason = "None";
+                        processSubmission(false);
+                    }
+                } else { timeLeft++; }
+
+                let absTime = Math.abs(timeLeft);
+                let h = Math.floor(absTime / 3600).toString().padStart(2, '0');
+                let m = Math.floor((absTime % 3600) / 60).toString().padStart(2, '0');
+                let s = (absTime % 60).toString().padStart(2, '0');
+                document.getElementById('timer').innerText = `${h}:${m}:${s}`;
+            }, 1000);
+        }
+
+        function handleExamKeyboardLock(event) {
+            if (isSubmitting || document.getElementById('mainWrapper').classList.contains('hidden')) return;
+
+            const isSubObjectiveInput = event.target && event.target.classList && event.target.classList.contains('sub-objective-input');
+            const isTypingField = event.target && /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName || "");
+            const blockedCombo =
+                event.key === 'Escape' ||
+                event.key === 'F11' ||
+                event.key === 'F5' ||
+                event.key === 'Meta' ||
+                event.key === 'Alt' ||
+                event.ctrlKey ||
+                event.metaKey ||
+                event.altKey;
+
+            if ((isSubObjectiveInput || isTypingField) && !blockedCombo) return;
+            if (!blockedCombo) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+            if (blockedCombo && !isSubmitting) {
+                violationReason = `Restricted keyboard input detected: ${event.key || 'UNKNOWN_KEY'}`;
+            }
+        }
+
+        function clearInactiveWindowGrace() {
+            if (inactiveWindowGraceTimer) clearTimeout(inactiveWindowGraceTimer);
+            if (inactiveWindowGraceInterval) clearInterval(inactiveWindowGraceInterval);
+            inactiveWindowGraceTimer = null;
+            inactiveWindowGraceInterval = null;
+            inactiveWindowReason = "";
+            inactiveWindowSecondsLeft = 0;
+            if (!isSubmitting) document.getElementById('secBanner').innerText = "SECURITY ACTIVE: DO NOT SWITCH TABS OR MINIMIZE";
+        }
+
+        function startInactiveWindowGrace(reason) {
+            if (isSubmitting || document.getElementById('mainWrapper').classList.contains('hidden')) return;
+            if (inactiveWindowGraceTimer) return;
+            inactiveWindowReason = reason || "Inactive exam window detected";
+            inactiveWindowSecondsLeft = INACTIVE_WINDOW_GRACE_SECONDS;
+            document.getElementById('secBanner').innerText = `WARNING: RETURN TO EXAM WINDOW WITHIN ${inactiveWindowSecondsLeft}s`;
+            inactiveWindowGraceInterval = setInterval(() => {
+                inactiveWindowSecondsLeft -= 1;
+                if (inactiveWindowSecondsLeft > 0) {
+                    document.getElementById('secBanner').innerText = `WARNING: RETURN TO EXAM WINDOW WITHIN ${inactiveWindowSecondsLeft}s`;
+                }
+            }, 1000);
+            inactiveWindowGraceTimer = setTimeout(() => {
+                violationReason = inactiveWindowReason;
+                autoTerminate();
+            }, INACTIVE_WINDOW_GRACE_SECONDS * 1000);
+        }
+
+        function verifyExamViewportIntegrity() {
+            if (isSubmitting || document.getElementById('mainWrapper').classList.contains('hidden')) return;
+            const availableWidth = screen.availWidth || window.innerWidth;
+            const availableHeight = screen.availHeight || window.innerHeight;
+            const widthRatio = window.innerWidth / availableWidth;
+            const heightRatio = window.innerHeight / availableHeight;
+
+            if (widthRatio < 0.78 || heightRatio < 0.78) {
+                autoTerminate("Split-screen, minimized, or resized exam window detected");
+            } else {
+                if (!document.hidden && document.fullscreenElement) clearInactiveWindowGrace();
+            }
+        }
+
+        function setupLockdown() {
+            document.addEventListener("visibilitychange", () => {
+                if (document.hidden && !isSubmitting) autoTerminate("TAB_SWITCH_OR_MINIMIZE");
+                if (!document.hidden) clearInactiveWindowGrace();
+            });
+            window.onblur = () => { if(!isSubmitting) startInactiveWindowGrace("Lost window focus"); };
+            window.onfocus = () => { clearInactiveWindowGrace(); };
+            document.addEventListener("fullscreenchange", () => {
+                if (!document.fullscreenElement && !isSubmitting) {
+                    autoTerminate("Fullscreen mode exited");
+                } else {
+                    clearInactiveWindowGrace();
+                }
+            });
+            document.addEventListener("keydown", handleExamKeyboardLock, true);
+            document.addEventListener("keyup", handleExamKeyboardLock, true);
+            document.addEventListener("keypress", handleExamKeyboardLock, true);
+            window.addEventListener("resize", verifyExamViewportIntegrity);
+            if (viewportGuardInterval) clearInterval(viewportGuardInterval);
+            viewportGuardInterval = setInterval(verifyExamViewportIntegrity, 1500);
+        }
+
+        async function autoTerminate(reason) {
+            if(isSubmitting) return;
+            isSubmitting = true;
+            clearInactiveWindowGrace();
+            if(reason) violationReason = reason;
+            document.getElementById('secBanner').innerText = "🚨 SESSION TERMINATED - SUBMITTING...";
+            await processSubmission(true);
+        }
+
+        function showConfirm() { document.getElementById('modalOverlay').style.display = "flex"; }
+        function closeModal() { if(!isSubmitting) document.getElementById('modalOverlay').style.display = "none"; }
+
+        async function processSubmission(isViolation = false) {
+            isSubmitting = true;
+            if(timerInterval) clearInterval(timerInterval);
+            if(viewportGuardInterval) clearInterval(viewportGuardInterval);
+            
+            let totalObtainable = 0;
+            let studentScore = 0;
+            let objectiveCount = 0;
+            let subObjectiveCount = 0;
+            let theoryCount = 0;
+
+            let finalAnswers = {};
+            try {
+                finalAnswers = JSON.parse(localStorage.getItem(`ans_${student.RegNo}_${selectedSubject}`) || "{}") || {};
+            } catch (error) {
+                finalAnswers = answers || {};
+            }
+
+            questions.forEach((q, i) => {
+                if(q.QuestionType === "SUB_OBJECTIVE") {
+                    subObjectiveCount++;
+                    let markValue = parseFloat(q[activeTestType]) || 0;
+                    totalObtainable += markValue;
+                    if (isSubObjectiveCorrect(finalAnswers[i] || "", q.Correct || "")) {
+                        studentScore += markValue;
+                    }
+                } else if(q.QuestionType !== "THEORY") {
+                    objectiveCount++;
+                    let markValue = parseFloat(q[activeTestType]) || 0;
+                    totalObtainable += markValue;
+                    const studentAns = (finalAnswers[i] || "").trim().toUpperCase();
+                    const correctAns = (q.Correct || "").trim().toUpperCase();
+                    if(studentAns !== "" && studentAns === correctAns) { studentScore += markValue; }
+                } else { theoryCount++; }
+            });
+
+            const answerScript = questions.map((q, i) => {
+                const questionType = q.QuestionType || "OBJECTIVE";
+                const markValue = questionType === "THEORY" ? 0 : (parseFloat(q[activeTestType]) || 0);
+                const studentAnswer = finalAnswers[i] || "";
+                const correctAnswer = q.Correct || "";
+                const isCorrect = questionType === "SUB_OBJECTIVE"
+                    ? isSubObjectiveCorrect(studentAnswer, correctAnswer)
+                    : questionType !== "THEORY" && String(studentAnswer).trim().toUpperCase() === String(correctAnswer).trim().toUpperCase();
+                return {
+                    QuestionNo: i + 1,
+                    QuestionID: q.QuestionID || q.SK || "",
+                    QuestionType: questionType,
+                    Question: q.Question || q.Text || "",
+                    QuestionHTML: q.QuestionHTML || q.TextHTML || q.Question || q.Text || "",
+                    A: q.A || "",
+                    B: q.B || "",
+                    C: q.C || "",
+                    D: q.D || "",
+                    AHTML: q.AHTML || q.A || "",
+                    BHTML: q.BHTML || q.B || "",
+                    CHTML: q.CHTML || q.C || "",
+                    DHTML: q.DHTML || q.D || "",
+                    StudentAnswer: studentAnswer,
+                    CorrectAnswer: correctAnswer,
+                    Mark: markValue,
+                    Awarded: isCorrect ? markValue : 0,
+                    IsCorrect: isCorrect
+                };
+            });
+
+            const percent = totalObtainable > 0 ? Math.round((studentScore / totalObtainable) * 100) : 0;
+            const modal = document.getElementById('modalOverlay');
+            modal.style.display = "flex";
+            document.getElementById('modalTitle').innerText = isViolation ? "DISCIPLINARY TERMINATION" : "PROCESSING...";
+            document.getElementById('modalMsg').innerText = "Syncing your answers with NICEGENE cloud...";
+            document.getElementById('modalActions').classList.add('hidden');
+
+            const resultPayload = {
+                action: "SUBMIT_EXAM_RESULT",
+                result: {
+                    regNo: student.RegNo,
+                    testType: activeTestType,
+                    term: activeTerm, 
+                    mode: activeSystemMode, // <--- ADD THIS LINE
+                    academicYear: activeAcademicYear, // <--- ADD THIS LINE FOR YEAR SYNC
+                    fullName: student.FullName,
+                    schoolID: student.SchoolID || student.RegNo.split('/')[1],
+                    studentClass: student.Class,
+                    studentArm: student.Arm || student.StudentArm || "",
+                    subject: selectedSubject,
+                    score: studentScore,
+                    total: totalObtainable,
+                    percentage: percent,
+                    answerScript,
+                    status: isViolation ? "FLAGGED" : "CLEAN",
+                    violation: isViolation ? violationReason : "None"
+                }
+            };
+
+            const safeSubmit = async () => {
+                try {
+                    const response = await LAEC.fetchWithRetry(AWS_CONFIG.registerEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        retryLabel: "Exam result submission",
+                        retries: 6,
+                        maxDelayMs: 10000,
+                        body: JSON.stringify(resultPayload)
+                    });
+                    if (!response.ok) throw new Error("Offline");
+                    const submitText = await response.text();
+                    let submitData = {};
+                    try {
+                        submitData = submitText ? JSON.parse(submitText) : {};
+                    } catch (parseError) {
+                        throw new Error("Invalid submission response");
+                    }
+                    if (submitData.status !== "success") {
+                        throw new Error(submitData.message || submitData.error || "Result was not saved.");
+                    }
+
+                    document.getElementById('modalTitle').innerText = isViolation ? "DISCIPLINARY TERMINATION" : "EXAM COMPLETED";
+                    document.getElementById('modalMsg').innerText = isViolation ? `Status: ${violationReason}` : `Submission successful! Redirecting...`;
+                    document.getElementById('finalScoreArea').classList.add('hidden');
+                    document.getElementById('percentCircle').innerText = "";
+                    document.getElementById('rawScoreLabel').innerHTML = "";
+
+                    setTimeout(() => { 
+                        releaseStudentSession().finally(() => {
+                            localStorage.removeItem(`ans_${student.RegNo}_${selectedSubject}`);
+                            sessionStorage.removeItem('selectedSubject');
+                            sessionStorage.removeItem('currentEffectiveMode');
+                            sessionStorage.removeItem('currentExamCategory');
+                            sessionStorage.removeItem('currentExamTerm');
+                            sessionStorage.removeItem('currentExamYear');
+                            sessionStorage.removeItem('activeStudent');
+                            location.replace("/login/");
+                        });
+                    }, 5000);
+
+                } catch (e) {
+                    document.getElementById('modalMsg').innerText = "⚠️ NETWORK LOST - RECONNECTING...";
+                    setTimeout(safeSubmit, 2000); 
+                }
+            };
+            safeSubmit();
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4248222cf3c0f1e',t:'MTc5MDYxNjk2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

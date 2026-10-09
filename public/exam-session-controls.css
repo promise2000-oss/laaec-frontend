@@ -1,0 +1,160 @@
+.exam-sync-panel {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(248, 251, 255, 0.96), rgba(240, 247, 255, 0.92));
+    border: 1px solid rgba(18, 58, 99, 0.08);
+}
+
+.exam-sync-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.exam-sync-title {
+    margin: 0;
+    font-family: "Space Grotesk", "Manrope", sans-serif;
+    font-size: 1rem;
+    color: var(--laec-blue-deep);
+}
+
+.exam-sync-copy {
+    margin: 0.4rem 0 0;
+    color: var(--text-soft);
+    font-size: 0.86rem;
+    line-height: 1.5;
+}
+
+.exam-sync-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.exam-sync-mini {
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(18, 58, 99, 0.1);
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--laec-blue-deep);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+}
+
+.exam-sync-mini:hover {
+    transform: translateY(-1px);
+}
+
+.exam-sync-summary {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.exam-sync-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.55rem 0.85rem;
+    border-radius: 999px;
+    background: rgba(18, 58, 99, 0.06);
+    border: 1px solid rgba(18, 58, 99, 0.08);
+    color: var(--laec-blue-deep);
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.exam-sync-window-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.exam-sync-window-note {
+    margin: 0.7rem 0 0;
+    color: var(--text-soft);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.exam-sync-paper-list {
+    display: grid;
+    gap: 0.8rem;
+    margin-top: 1rem;
+    max-height: 340px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+.exam-sync-paper-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.exam-sync-paper-list::-webkit-scrollbar-thumb {
+    background: rgba(18, 58, 99, 0.22);
+    border-radius: 999px;
+}
+
+.exam-sync-paper-item {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+    padding: 0.95rem 1rem;
+    border-radius: 16px;
+    border: 1px solid rgba(18, 58, 99, 0.08);
+    background: rgba(255, 255, 255, 0.96);
+}
+
+.exam-sync-paper-item input[type="checkbox"] {
+    width: auto;
+    margin-top: 0.2rem;
+    accent-color: var(--laec-blue);
+    transform: scale(1.15);
+}
+
+.exam-sync-paper-label {
+    display: block;
+    font-weight: 800;
+    color: var(--laec-blue-deep);
+    font-size: 0.88rem;
+}
+
+.exam-sync-paper-meta {
+    margin-top: 0.25rem;
+    color: var(--text-soft);
+    font-size: 0.8rem;
+    line-height: 1.45;
+}
+
+.exam-sync-empty {
+    padding: 1.15rem;
+    border-radius: 16px;
+    border: 1px dashed rgba(18, 58, 99, 0.18);
+    background: rgba(255, 255, 255, 0.74);
+    color: var(--text-soft);
+    font-size: 0.86rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+    .exam-sync-panel {
+        padding: 0.9rem;
+    }
+
+    .exam-sync-toolbar {
+        width: 100%;
+    }
+
+    .exam-sync-mini {
+        flex: 1 1 140px;
+        text-align: center;
+    }
+}

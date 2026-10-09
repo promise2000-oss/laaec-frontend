@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAEC | Official CBT Portal</title>
+    <link rel="icon" href="/laec%20logo.png" type="image/png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --laec-blue: #004a99;
+            --laec-accent: #00c2ff;
+            --white: #ffffff;
+            --glass: rgba(255, 255, 255, 0.12);
+            --glass-heavy: rgba(255, 255, 255, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Seplat-style Full Screen Background */
+        html, body {
+            min-height: 100%;
+        }
+
+        body {
+            min-height: 100vh;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+            isolation: isolate;
+            background-color: #0b2f57;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image: url('https://images.unsplash.com/photo-1523240798132-875721a3afc3?auto=format&fit=crop&w=1600&q=80');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            transform: scale(1.02);
+            z-index: -3;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at top left, rgba(0, 194, 255, 0.18), transparent 28%),
+                linear-gradient(rgba(0, 74, 153, 0.68), rgba(0, 31, 63, 0.86));
+            z-index: -2;
+        }
+
+        .bubble-field {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .bubble {
+            position: absolute;
+            bottom: -18vh;
+            width: var(--size);
+            height: var(--size);
+            left: var(--left);
+            border-radius: 50% 50% 48% 52%;
+            background:
+                radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.9) 0 8%, transparent 9%),
+                radial-gradient(circle at 70% 78%, rgba(0, 194, 255, 0.18), transparent 35%),
+                rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            box-shadow:
+                inset 0 0 18px rgba(255, 255, 255, 0.28),
+                inset -10px -14px 28px rgba(0, 194, 255, 0.08),
+                0 10px 34px rgba(0, 0, 0, 0.08);
+            opacity: 0;
+            transform: translate3d(0, 0, 0) scale(0.86);
+            animation: bubbleFloat var(--duration) linear infinite;
+            animation-delay: var(--delay);
+        }
+
+        .bubble::after {
+            content: "";
+            position: absolute;
+            inset: 14% 18% auto auto;
+            width: 22%;
+            height: 22%;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.28);
+            filter: blur(1px);
+        }
+
+        @keyframes bubbleFloat {
+            0% {
+                opacity: 0;
+                transform: translate3d(0, 0, 0) scale(0.82);
+            }
+            12% {
+                opacity: 0.72;
+            }
+            50% {
+                transform: translate3d(var(--drift), -56vh, 0) scale(1);
+            }
+            88% {
+                opacity: 0.58;
+            }
+            100% {
+                opacity: 0;
+                transform: translate3d(calc(var(--drift) * -0.45), -118vh, 0) scale(1.12);
+            }
+        }
+
+        .home-wrapper {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            width: 100%;
+            max-width: 900px;
+            padding: 28px 20px 20px;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Centered Header Text */
+        .header-section {
+            color: white;
+            margin-bottom: 32px;
+        }
+
+        .logo-main {
+            display: block;
+            width: auto;
+            max-width: 148px;
+            padding-top: 25px;
+            height: 114px;
+            margin-bottom: 14px;
+            margin-left: auto;
+            margin-right: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 6px 10px rgba(0,0,0,0.28));
+        }
+
+        h1 {
+            font-size: clamp(1.6rem, 5vw, 1.8rem);
+            font-weight: 800;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+
+        .welcome-text {
+            font-size: 1.1rem;
+            max-width: 850px;
+            margin: 0 auto;
+            line-height: 1.6;
+            opacity: 0.95;
+            font-weight: 400;
+            text-align: justify;
+        }
+
+        .nicegene-brand {
+            font-weight: 800;
+            color: var(--laec-accent);
+            text-decoration: none;
+            border-bottom: 1px solid var(--laec-accent);
+        }
+
+        /* Glassy Action Cards */
+        .portal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-top: 36px;
+        }
+
+        .action-card {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 24px;
+            padding: 40px 30px;
+            color: white;
+            text-decoration: none;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .action-card:hover {
+            background: var(--glass-heavy);
+            transform: translateY(-10px);
+            border-color: var(--laec-accent);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .icon-box {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .card-desc {
+            font-size: 0.85rem;
+            opacity: 0.7;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        /* Admin Specific Card Style (Slightly more authoritative) */
+        .admin-card {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        footer {
+            margin-top: 40px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.75rem;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 650px) {
+            body {
+                overflow-y: auto;
+                align-items: flex-start;
+                padding: 18px 0;
+            }
+            .home-wrapper { padding-top: 18px; }
+            .logo-main {
+                max-width: 112px;
+                height: 84px;
+            }
+            .portal-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .bubble {
+                animation: none;
+                opacity: 0.18;
+            }
+        }
+    </style>
+</head>
+<body><a href="https://www.laaec.com/cdn-cgi/content?id=_ORxip4E4OCw38tL7U373Zlf45aIjmS6Pq61VIaGqsI-1790618132.299537-1.2.1.1-v_ngsQ_ZQ_6XeHw8Z_wDUuc9m8AeAF6qxsWHq6QlsvmT27JYE47XywFl4Xpqa8fI" aria-hidden="true" rel="nofollow noopener" style="display: none !important; visibility: hidden !important"></a>
+
+<div class="bubble-field" aria-hidden="true">
+    <span class="bubble" style="--size: 72px; --left: 6%; --duration: 19s; --delay: -4s; --drift: 34px;"></span>
+    <span class="bubble" style="--size: 46px; --left: 14%; --duration: 15s; --delay: -10s; --drift: -26px;"></span>
+    <span class="bubble" style="--size: 118px; --left: 24%; --duration: 24s; --delay: -7s; --drift: 52px;"></span>
+    <span class="bubble" style="--size: 58px; --left: 38%; --duration: 17s; --delay: -2s; --drift: -42px;"></span>
+    <span class="bubble" style="--size: 92px; --left: 52%; --duration: 22s; --delay: -13s; --drift: 30px;"></span>
+    <span class="bubble" style="--size: 40px; --left: 63%; --duration: 14s; --delay: -5s; --drift: -18px;"></span>
+    <span class="bubble" style="--size: 132px; --left: 72%; --duration: 27s; --delay: -15s; --drift: -58px;"></span>
+    <span class="bubble" style="--size: 64px; --left: 84%; --duration: 18s; --delay: -8s; --drift: 36px;"></span>
+    <span class="bubble" style="--size: 34px; --left: 93%; --duration: 13s; --delay: -1s; --drift: -24px;"></span>
+</div>
+
+<div class="home-wrapper">
+    <div class="header-section">
+        <img src="laec logo.png" alt="LAEC Logo" class="logo-main">
+        <h1>Lagos Archdiocesan Education Commission</h1>
+        <p class="welcome-text">
+            Welcome to the official Cloud-based CBT portal for Lagos Archdiocesan Education Commission, Catholic Archdiocese of Lagos. This is a multi-tenant cloud-based examination center 
+            securely and efficiently designed by 
+            <a href="https://www.nicegeneco.com" target="_blank" class="nicegene-brand">NICEGENE TECHNOLOGIES</a>, 
+            for seamless, secure and scalable educational assessments. Please select your portal to proceed with your examination or administrative tasks.
+        </p>
+    </div>
+
+    <div class="portal-grid">
+        <a href="/login/" class="action-card">
+            <div class="icon-box">🎓</div>
+            <div class="card-title">Student Login</div>
+            <div class="card-desc">Access your Examination</div>
+        </a>
+
+        <a href="/control/" class="action-card admin-card">
+            <div class="icon-box">🛡️</div>
+            <div class="card-title">Administrator Control</div>
+            <div class="card-desc">Manage System & Records</div>
+        </a>
+    </div>
+
+    <footer>
+        &copy; <script>document.write(new Date().getFullYear())</script> NICEGENE TECHNOLOGIES. All rights reserved. <br>
+        Optimized for secure, large-scale educational assessments.
+    </footer>
+</div>
+
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4249e9edabd5d26',t:'MTc5MDYxODEzMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

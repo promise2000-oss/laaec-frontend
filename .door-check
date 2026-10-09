@@ -1,0 +1,12 @@
+{
+  "doors": 6,
+  "roles": [
+    "CENTRAL_ADMIN",
+    "EXAM_COMMITTEE",
+    "ICT_ADMIN",
+    "SCHOOL_ADMIN",
+    "SUPER_ADMIN",
+    "TEACHER"
+  ],
+  "errors": 0
+}

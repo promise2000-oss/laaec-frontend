@@ -1,0 +1,17 @@
+/*
+ * base.css — surface-independent structural rules.
+ *
+ * #app must not generate a box: in every original document the page's own
+ * root element is a direct child of <body>, and <body>'s flex layouts resolve
+ * widths against that structure (e.g. `/`: .home-wrapper { width: 100% } of a
+ * 1440px body, capped by max-width: 900px). `display: contents` promotes the
+ * view's roots into body's flex layout so the original maths holds exactly.
+ *
+ * The layout roots (.surface-glass, and later .surface-exam / .surface-admin)
+ * use the same trick; inherited properties (font-family, custom properties)
+ * still cascade through display: contents elements.
+ */
+
+#app {
+  display: contents;
+}
