@@ -21,10 +21,38 @@ import type {
   Question,
   QuestionStatus,
   QuestionSubmissionRecord,
+  SchoolRecord,
   TeacherNotice,
 } from '../types';
 import { STORAGE_KEYS } from '../types';
-import { SCHOOL_ORDER } from '../lib/console';
+import { useSessionStore } from '../stores/session';
+
+/**
+ * The school roles held by this session, for the transport's permission gate.
+ *
+ * Read from the store rather than from storage directly, because the store is
+ * where `setSchoolRole` writes and it is what the rail reads — so all three
+ * consumers see the same list in the same tick. Falling back to storage covers
+ * the first paint, before Pinia has hydrated; a role granted a moment earlier
+ * is in storage by then either way.
+ */
+const readSchoolRoles = (): string[] => {
+  try {
+    const store = useSessionStore();
+    if (store.schoolRoles.length) return store.schoolRoles;
+  } catch {
+    // Pinia not active yet — storage is the fallback below.
+  }
+  const raw = localStorage.getItem(STORAGE_KEYS.AdminSchoolRoles);
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((e): e is string => typeof e === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+import { SCHOOL_NAMES, SCHOOL_ORDER } from '../lib/console';
 import {
   bypassesPermissions,
   hasAdminPlaceholder,
@@ -176,6 +204,8 @@ interface PersistedState {
   calendarEvents: CalendarEvent[];
   notices: NoticeBoardItem[];
   notificationCounter: number;
+  /** The archdiocesan school registry, seeded from the ten hardcoded schools. */
+  schools: SchoolRecord[];
 }
 
 const seedState = (): PersistedState => ({
@@ -188,6 +218,13 @@ const seedState = (): PersistedState => ({
   calendarEvents: MOCK_CALENDAR_EVENTS.map((item) => ({ ...item })),
   notices: MOCK_NOTICES.map((item) => ({ ...item })),
   notificationCounter: MOCK_NOTIFICATIONS.length,
+  /* The school registry (D23 runtime extension) is seeded from the ten schools
+     the origin hardcodes, marked builtin so the panel can protect them. */
+  schools: SCHOOL_ORDER.map((code) => ({
+    Code: code,
+    Name: SCHOOL_NAMES[code],
+    builtin: true,
+  })),
 });
 
 const loadState = (): PersistedState => {
@@ -196,7 +233,13 @@ const loadState = (): PersistedState => {
     if (!raw) return seedState();
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     if (!Array.isArray(parsed.submissions) || !Array.isArray(parsed.staffDirectory)) return seedState();
-    return { ...seedState(), ...parsed } as PersistedState;
+    const seeded = seedState();
+    /* An older session (or a corrupt one) may carry no school registry, so fall
+       back to the seeded ten rather than rendering an empty dropdown. */
+    const schools = Array.isArray(parsed.schools) && parsed.schools.length
+      ? parsed.schools
+      : seeded.schools;
+    return { ...seeded, ...parsed, schools } as PersistedState;
   } catch {
     return seedState();
   }
@@ -218,6 +261,7 @@ const saveState = (): void => {
         calendarEvents: initialState.calendarEvents,
         notices: initialState.notices,
         notificationCounter: initialState.notificationCounter,
+        schools: initialState.schools,
       } satisfies PersistedState),
     );
   } catch {
@@ -252,6 +296,14 @@ let submissionCounter = initialState.submissionCounter;
 const notifications: PortalNotification[] = initialState.notifications;
 const calendarEvents: CalendarEvent[] = initialState.calendarEvents;
 const noticeBoard: NoticeBoardItem[] = initialState.notices;
+
+/**
+ * The archdiocesan school registry (D23 runtime extension). Seeded from the ten
+ * hardcoded schools and extended at runtime by ADD_SCHOOL, so a super
+ * administrator's new school survives the rest of the session exactly like a
+ * published notice or an added event does.
+ */
+const schools: SchoolRecord[] = initialState.schools;
 
 let notificationCounter = notifications.length;
 
@@ -626,13 +678,19 @@ const handlers: Handlers = {
     const username = req.username || '';
     const record = staffDirectory.find((a) => a.Username === username);
     const role = (record?.Role ?? (req.role || 'TEACHER')) as AdminRole;
+    /* The claim AND the held school roles, so the payload the session store
+       hydrates from agrees with the transport gate that read the same two
+       things. Returning only the claim's half here is what would leave the rail
+       offering a school role's pages while every call behind them was refused. */
+    const schoolRoles = readSchoolRoles();
     return {
       ...ok('Permissions retrieved (mock).'),
       username: username,
       name: record?.FullName || '',
       schoolID: record?.SchoolID || '',
       role: role,
-      permissions: effectivePermissions([], role),
+      schoolRoles,
+      permissions: effectivePermissions([], role, schoolRoles),
     };
   },
 
@@ -692,6 +750,16 @@ const handlers: Handlers = {
       admins: wanted.length ? scoped.filter((a) => wanted.includes(a.Role)) : scoped,
     };
   },
+  /**
+   * The archdiocesan school registry (D23 runtime extension). Returns the ten
+   * seeded schools plus anything a super administrator has added this session,
+   * in registry order. Every console's school dropdown can read this list
+   * instead of a hardcoded constant.
+   */
+  GET_SCHOOLS: () => ({
+    ...ok('School registry retrieved (mock).'),
+    schools: schools.map((s) => ({ ...s })),
+  }),
   GET_EXAM_CONFIG: () => ({
     ...ok('Exam configuration retrieved (mock).'),
     config: MOCK_CONFIG,
@@ -752,6 +820,49 @@ const handlers: Handlers = {
   UPDATE_ADMIN_STATUS: (req) => ok(`Status set to ${req.newStatus} (mock).`),
   REQUEST_ADMIN_PASSWORD_RESET: () => ok('Password reset requested (mock).'),
   CONFIRM_ADMIN_PASSWORD_RESET: () => ok('Password reset confirmed (mock).'),
+  /**
+   * Register a new archdiocesan school (D23 runtime extension). The origin's
+   * ten schools are hardcoded with no way to add one; this is that way. The
+   * code is normalised to uppercase and must be unique and non-reserved, so a
+   * new school cannot shadow an existing SchoolID or the GLOBAL scope every
+   * console's cross-school reads depend on.
+   */
+  ADD_SCHOOL: (req) => {
+    const code = String(req.code || '').trim().toUpperCase();
+    const name = String(req.name || '').trim();
+    if (!code || !name) {
+      return { status: 'error', message: 'Both a school code and a school name are required.' };
+    }
+    /* SFC-style codes: letters and digits only, so the code stays a clean
+       SchoolID in registration numbers, export filenames and S3 keys. */
+    if (!/^[A-Z0-9]{2,10}$/.test(code)) {
+      return {
+        status: 'error',
+        message: 'School code must be 2–10 letters or numbers, with no spaces or punctuation.',
+      };
+    }
+    /* GLOBAL is the archdiocese's own scope and ALL is the cross-school
+       wildcard; either as a code would make every scoped read ambiguous. */
+    if (code === 'GLOBAL' || code === 'ALL') {
+      return { status: 'error', message: `"${code}" is a reserved scope and cannot be a school code.` };
+    }
+    if (schools.some((s) => s.Code === code)) {
+      return { status: 'error', message: `School code ${code} already exists.` };
+    }
+    const record: SchoolRecord = {
+      Code: code,
+      Name: name,
+      ...(String(req.address || '').trim() ? { Address: String(req.address).trim() } : {}),
+      builtin: false,
+    };
+    schools.push(record);
+    saveState();
+    return {
+      ...ok(`School ${code} registered (mock).`),
+      message: `${name} (${code}) added to the archdiocesan registry. It is now selectable across every console.`,
+      school: { ...record },
+    };
+  },
   SEND_ADMIN_PASSWORD_CHANGED_EMAIL: () => ok('Password change email dispatched (mock).'),
   BULK_UPLOAD_QUESTIONS: (req) => ({
     ...ok(`${req.questions.length} questions uploaded (mock).`),
@@ -1162,7 +1273,14 @@ export async function callApi<A extends ActionName>(
                `hasAdminPlaceholder` is what separates the two cases, since
                `null` on its own means "no permission needed". */
             !hasAdminPlaceholder(action)
-          : bypassesPermissions(role) || hasPermission(effectivePermissions([], role), required);
+          : bypassesPermissions(role) ||
+            /* Both authorisation axes, and the same two the rail is filtered
+               by. Reading only the claim here is what made a school role
+               decorative: granting one could change the navigation but not
+               whether the transport would perform the action the navigation
+               offered, which is the disagreement `SUPER_ADMIN_PERMISSIONS` was
+               introduced to eliminate for a different reason. */
+            hasPermission(effectivePermissions([], role, readSchoolRoles()), required);
 
     if (!granted) {
       return {

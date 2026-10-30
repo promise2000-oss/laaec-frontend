@@ -24,6 +24,7 @@ import { callApi } from '../api';
 import { bypassesPermissions, hasPermission, permissionForAction } from '../lib/permissions';
 import { effectivePermissions, primaryRoleName } from '../lib/roles';
 import { STORAGE_KEYS, type AdminRole } from '../types';
+import { SCHOOL_ROLE_PERMISSIONS } from '../types/admin-registry';
 
 interface SessionState {
   username: string;
@@ -31,7 +32,27 @@ interface SessionState {
   /** The claim stored for this session; empty when signed out. */
   role: string;
   schoolId: string;
-  /** Effective permissions: granted union role defaults. */
+  /**
+   * The 33 school roles this session holds, by their live names.
+   *
+   * The second authorisation axis, and the one the roles page edits. A claim
+   * decides whether `/admin/` opens; these decide what is reachable once it has.
+   * Held here rather than in localStorage alone so granting a role updates the
+   * rail in the same tick, not on the next navigation.
+   */
+  schoolRoles: string[];
+  /**
+   * The school role the rail is being previewed as, or empty for the live view.
+   *
+   * A view over the authorisation model, NOT a change to it. Only
+   * `navPermissions` reads it; the transport gate reads `permissions` and the
+   * held roles, so a preview can show a narrower rail but can never make a call
+   * succeed that the operator's own claim would refuse. That asymmetry is the
+   * whole safety property of the control, and it is why the field lives apart
+   * from `permissions` rather than overwriting it.
+   */
+  previewRole: string;
+  /** Effective permissions: granted union role defaults union school roles. */
   permissions: string[];
   /** Epoch ms of the last successful server sync, 0 if never. */
   syncedAt: number;
@@ -44,10 +65,32 @@ const emptyState = (): SessionState => ({
   name: '',
   role: '',
   schoolId: '',
+  schoolRoles: [],
+  previewRole: '',
   permissions: [],
   syncedAt: 0,
   ready: false,
 });
+
+/**
+ * The school roles persisted for this session.
+ *
+ * Read defensively: the key is written by this store and by the roles panel, and
+ * a hand-edited or half-written value must not be able to crash the store's
+ * first paint. Anything unparseable is treated as no roles, which narrows rather
+ * than widens.
+ */
+const readSchoolRoles = (): string[] => {
+  const raw = localStorage.getItem(STORAGE_KEYS.AdminSchoolRoles);
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry): entry is string => typeof entry === 'string');
+  } catch {
+    return [];
+  }
+};
 
 export const useSessionStore = defineStore('session', {
   state: (): SessionState => emptyState(),
@@ -55,6 +98,17 @@ export const useSessionStore = defineStore('session', {
   getters: {
     /** The claim as a typed role, falling back to the teacher portal. */
     roleKey: (state): AdminRole => primaryRoleName(state.role),
+
+    /**
+     * The codes the RAIL should be filtered by.
+     *
+     * `permissions` while live; the previewed role's own codes while previewing.
+     * Only the navigation reads this — the transport gate reads `permissions` and
+     * the held roles directly, so a preview can narrow what is offered without
+     * ever widening, or appearing to widen, what a call would be allowed to do.
+     */
+    navPermissions: (state): string[] =>
+      state.previewRole ? [...(SCHOOL_ROLE_PERMISSIONS[state.previewRole] ?? [])] : state.permissions,
 
     /** Whether a session exists at all — the route guards read this first. */
     isAuthenticated: (state): boolean => state.role !== '' && state.username !== '',
@@ -83,8 +137,39 @@ export const useSessionStore = defineStore('session', {
       this.name = localStorage.getItem(STORAGE_KEYS.AdminName) || '';
       this.schoolId = localStorage.getItem(STORAGE_KEYS.SchoolID) || '';
       this.role = role;
-      this.permissions = effectivePermissions([], role);
+      this.schoolRoles = readSchoolRoles();
+      this.permissions = effectivePermissions([], role, this.schoolRoles);
       this.ready = true;
+    },
+
+    /**
+     * Grant or revoke a school role for this session, and re-derive the
+     * effective permission set in the same step.
+     *
+     * Recomputing rather than adding or subtracting is the point: the rail, the
+     * nav filter and every gated control read `permissions`, so a role change
+     * that did not go through the derivation would leave a revoked role's pages
+     * on screen until the next navigation. Persisted as well as applied, because
+     * the next `syncLocal()` reads from storage and would otherwise discard it.
+     */
+    setSchoolRole(roleName: string, held: boolean) {
+      const next = held
+        ? Array.from(new Set([...this.schoolRoles, roleName]))
+        : this.schoolRoles.filter((r) => r !== roleName);
+      this.schoolRoles = next;
+      localStorage.setItem(STORAGE_KEYS.AdminSchoolRoles, JSON.stringify(next));
+      this.permissions = effectivePermissions([], this.role, next);
+    },
+
+    /**
+     * Preview the rail as one school role, or clear the preview with `''`.
+     *
+     * Never persisted and never consulted by `callApi`. It changes what is
+     * offered, not what is permitted, which is why it is a separate field from
+     * `permissions` rather than an argument to `setSchoolRole`.
+     */
+    setPreviewRole(roleName: string) {
+      this.previewRole = roleName;
     },
 
     /**
@@ -119,6 +204,7 @@ export const useSessionStore = defineStore('session', {
           name?: string;
           schoolID?: string;
           role?: string;
+          schoolRoles?: string[];
           permissions?: string[];
         };
         if (!payload.role) return;
@@ -126,7 +212,15 @@ export const useSessionStore = defineStore('session', {
         this.name = payload.name || this.name;
         this.schoolId = payload.schoolID || this.schoolId;
         this.role = payload.role;
-        this.permissions = effectivePermissions(payload.permissions ?? [], payload.role);
+        /*
+         * The payload's own list, not storage, when it carries one — the server
+         * is the authority on what this operator holds, exactly as it is for the
+         * claim just above. Falling back to storage covers a handler that
+         * predates the field rather than silently emptying a held role.
+         */
+        if (Array.isArray(payload.schoolRoles)) this.schoolRoles = payload.schoolRoles;
+        else this.schoolRoles = readSchoolRoles();
+        this.permissions = effectivePermissions(payload.permissions ?? [], payload.role, this.schoolRoles);
         this.syncedAt = Date.now();
         this.ready = true;
         /*

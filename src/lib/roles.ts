@@ -13,6 +13,7 @@
  */
 
 import type { AdminRole } from '../types';
+import { permissionsForSchoolRoles } from '../types/admin-registry';
 
 /* ── role predicates ────────────────────────────────────────────────────── */
 
@@ -241,6 +242,12 @@ const TEACHER_DEFAULTS = [
 const SUPER_ADMIN_PORTAL_DEFAULTS = [
   /* Dashboards */
   'dashboard.superadmin',
+  /* Archdiocesan school registry (D23 runtime extension). The registry is
+     master-level: only the super-admin console reads and writes it, so these
+     codes are granted here and to no other role — the same rule that keeps the
+     Saint Finbarr's portal grant with its one owning console. */
+  'schools.read',
+  'schools.manage',
   /* User & roles */
   'users.read',
   'users.create',
@@ -256,45 +263,21 @@ const SUPER_ADMIN_PORTAL_DEFAULTS = [
   'permissions.delete',
   'invitations.send',
   'audit_log.view',
-  /* Staff & HR */
-  'staff.add',
-  'staff.create',
-  'staff.update',
-  'staff.delete',
-  'staff.import',
-  'staff.portal',
-  'departments.read',
-  'departments.create',
-  'departments.update',
-  'departments.delete',
-  'designations.read',
-  'designations.create',
-  'designations.update',
-  'designations.delete',
-  'attendance.read',
-  'attendance.manage',
-  'attendance.mark',
-  'attendance.delete',
-  'leave.view',
-  'leave.apply',
-  'leave.approve',
-  'leave.manage',
-  'queries.view',
-  'queries.issued',
-  'queries.issue',
-  'queries.resolve',
-  'awards.read',
-  'awards.manage',
-  'categories.view',
-  'categories.manage',
-  /* Students & parents */
+  /* Students (exam data — registering candidates). The Staff & HR, departments,
+     designations, attendance, leave, queries, awards and categories codes that
+     used to sit here are REMOVED: they are Saint Finbarr's school-management,
+     not CBT/exam operations. `staff.read`/`staff.manage` still reach SUPER_ADMIN
+     through CENTRAL_ADMIN's defaults (cross-school staff onboarding, D-55), so
+     the Staff List stays; every other HR control drops from the rail. */
   'students.add',
   'students.create',
   'students.update',
   'students.delete',
   'students.import',
-  'parents.read',
-  /* Academics */
+  /* Academics — kept whole. The exam portal organises candidates by session,
+     class, arm and subject, so the whole academic module (sessions, classes,
+     arms, subjects, timetables, assignments, class/subject-teachers) stays; it
+     is data the exam flow depends on, not school-management overhead. */
   'academic.read',
   'academic.sessions.create',
   'academic.sessions.update',
@@ -310,44 +293,8 @@ const SUPER_ADMIN_PORTAL_DEFAULTS = [
   'lesson-plans.manage',
   'lesson-plans.manageAll',
   'weekly-reports.manage',
-  /* Communication */
-  'communication.notices.create',
-  'communication.notices.update',
-  'communication.notices.delete',
-  'communication.events.update',
-  'communication.events.delete',
-  'communication.conversations.manage',
-  /* Inventory */
-  'inventory.read',
-  'inventory.stock.read',
-  'inventory.stock.manage',
-  'inventory.categories.manage',
-  'inventory.suppliers.read',
-  'inventory.suppliers.manage',
-  'inventory.assets.read',
-  'inventory.assets.manage',
-  'inventory.clinic.read',
-  'inventory.clinic.manage',
-  'inventory.sales.read',
-  'inventory.sales.create',
-  'inventory.sales.manage',
-  'inventory.sales.release',
-  /* Store */
-  'store.browse',
-  'store.cart.manage',
-  'store.order.place',
-  'store.orders.read',
-  'store.queue.read',
-  'store.queue.manage',
-  /* School fees */
-  'schoolfees.read',
-  'schoolfees.manage',
-  'schoolfees.pay',
-  /* Wallets */
-  'wallet.view',
-  'wallet.manage',
-  'wallet.fund',
-  /* Results */
+  /* Results — the admin-portal marking pipeline, exam-core and kept whole
+     (upload windows, vetting, publishing, grading, committee, report cards). */
   'results.window.read',
   'results.window.manage',
   'results.upload',
@@ -367,7 +314,6 @@ const SUPER_ADMIN_PORTAL_DEFAULTS = [
   /* System */
   'system.settings.update',
   'dashboard.admin',
-  'dashboard.hr',
 ] as const;
 
 /**
@@ -455,10 +401,24 @@ export function isSuperAdmin(role: string | undefined | null): boolean {
  * The union of a session's granted permissions with the defaults its role
  * implies. Used for nav filtering and for every `hasPermission` call, so a
  * console never renders empty because a backend grant is missing or stale.
+ *
+ * `schoolRoles` is the SECOND axis, and it is optional because most callers do
+ * not have it: the LAEC claim decides whether `/admin/` opens at all, and the 33
+ * school roles decide what an operator may do once inside. Both are real — a
+ * session is a claim PLUS zero or more school roles — and both feed the same
+ * effective set, so the rail filter and every `can()` answer consistently.
+ *
+ * The union, not the intersection, is the deliberate choice: on the live portal
+ * a user's permissions are the union of everything their roles grant, so a
+ * session holding Bursary and Teacher reaches both. Taking an intersection here
+ * would make a second role subtract the first, which is not how the origin
+ * behaves and would leave the roles page able to make a session narrower by
+ * accident.
  */
 export function effectivePermissions(
   permissions: string[] | undefined | null,
   role: string | undefined | null,
+  schoolRoles?: readonly string[] | null,
 ): string[] {
   const result = new Set<string>(permissions ?? []);
   const defaults = ROLE_DEFAULT_PERMISSIONS[normalize(role) as AdminRole];
@@ -466,5 +426,6 @@ export function effectivePermissions(
   // A super administrator's exemption is materialised as a grant, so that
   // `can()` and the nav filter return the same answer for them.
   if (isSuperAdmin(role)) for (const code of SUPER_ADMIN_PERMISSIONS) result.add(code);
+  for (const code of permissionsForSchoolRoles(schoolRoles)) result.add(code);
   return [...result];
 }

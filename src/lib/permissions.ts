@@ -46,6 +46,12 @@ export const PERMISSION_CODES = [
   'system.read',
   'password.reset',
 
+  /* archdiocesan school registry (D23 runtime extension). `schools.read` gates
+     the registry panel and its dropdowns; `schools.manage` gates ADD_SCHOOL,
+     which only a super administrator performs. */
+  'schools.read',
+  'schools.manage',
+
   /* St Finbarr's teacher portal (teacher-portal addendum, D-72). The codes are
      the origin's own `module.action` strings, so a code named here can be
      matched one-for-one against `lib/navigation/teacher-nav.ts` in the deployed
@@ -320,6 +326,11 @@ export const ACTION_PERMISSIONS: Record<string, string | null> = {
   DELETE_ADMIN_ACCESS: 'admins.manage',
   UPDATE_ADMIN_STATUS: 'admins.manage',
 
+  /* archdiocesan school registry (D23 runtime extension). Adding a school is a
+     master-level act — it widens the registry every console's dropdowns read —
+     so it is gated on its own code rather than folded into admins.manage. */
+  ADD_SCHOOL: 'schools.manage',
+
   /* portal and examination configuration */
   UPDATE_MODE: 'exam.settings.manage',
   UPDATE_PORTAL: 'exam.settings.manage',
@@ -467,6 +478,10 @@ export const ACTION_PERMISSIONS: Record<string, string | null> = {
 
   SAVE_INVENTORY_SETTINGS: 'system.settings.update',
   SAVE_STOCK_MOVEMENT: 'inventory.stock.manage',
+  /* The live sheet's Create Sale button sits behind `inventory.sales.create`,
+     and the action reserves stock, so it is gated on the permission that governs
+     the thing it reserves rather than on sales bookkeeping alone. */
+  CREATE_SALE: 'inventory.sales.create',
 
   /* Notice board writes reuse the LAEC `notices.*` codes: the admin portal's
      notice form and LAEC's notice board are the same feature reached from two

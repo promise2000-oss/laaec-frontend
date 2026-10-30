@@ -35,6 +35,7 @@ import type {
   NoticeBoardItem,
   TeacherNotice,
   ResultRecord,
+  SchoolRecord,
   Student,
 } from '../types';
 import type {
@@ -219,6 +220,19 @@ export interface ApiMap {
     req: { schoolID?: string; roles?: string };
     res: ApiEnvelope & Success<{ admins: AdminAccount[] }>;
   };
+  /**
+   * The archdiocesan school registry (PRD D23).
+   *
+   * The origin hardcodes ten schools in `SCHOOL_NAMES`. This action returns
+   * those ten as the seed plus anything a super administrator has added at
+   * runtime, so every console's school dropdown can be driven from one list
+   * rather than from a constant each. `schoolID` is accepted for transport
+   * parity with the other reads and is ignored — the registry is global.
+   */
+  GET_SCHOOLS: {
+    req: { schoolID?: string };
+    res: ApiEnvelope & Success<{ schools: SchoolRecord[] }>;
+  };
   GET_EXAM_CONFIG: {
     req: { schoolID: string };
     res: ApiEnvelope &
@@ -293,6 +307,14 @@ export interface ApiMap {
         name: string;
         schoolID: string;
         role: AdminRole;
+        /**
+         * The 33 school roles this session holds, by their live names.
+         *
+         * Reported alongside the claim rather than folded into it, because the
+         * two answer different questions: the claim gates the console and these
+         * gate what is reachable inside it. The session store unions both.
+         */
+        schoolRoles: string[];
         permissions: string[];
       }>;
   };
@@ -539,6 +561,31 @@ export interface ApiMap {
       schoolID?: string;
     };
     res: ApiEnvelope;
+  };
+  /**
+   * Register a new archdiocesan school (PRD D23, runtime extension).
+   *
+   * The origin's ten schools are hardcoded and there is no way to add one.
+   * This is that way: a super administrator submits a short code and a name
+   * from the `/admin/` Schools panel. The request carries the creator's
+   * identity for the audit trail, exactly as `CREATE_ADMIN_ACCESS` does, so
+   * the transport can record who widened the registry.
+   *
+   * The response echoes the created record so the panel can append it to its
+   * own list without a second read.
+   */
+  ADD_SCHOOL: {
+    req: {
+      /** Short SchoolID, uppercased by the handler (e.g. "ABC"). */
+      code: string;
+      /** Display name shown in the school dropdowns. */
+      name: string;
+      /** Optional address carried on the school's profile row. */
+      address?: string;
+      creatorUsername?: string;
+      creatorRole?: AdminRole;
+    };
+    res: ApiEnvelope & Success<{ school?: SchoolRecord }>;
   };
   UPDATE_ADMIN_STATUS: {
     req: { schoolID: string; username: string; newStatus: AdminStatus };
@@ -1011,6 +1058,27 @@ export interface ApiMap {
   ADD_TO_CART: {
     req: { stockItemId: string; quantity?: number };
     res: Success<{ cart: import('../types/admin').StoreCart }> & ApiEnvelope;
+  };
+
+  /**
+   * Raise a sale request.
+   *
+   * The live `/inventory/sales` "Create Sale" sheet, transcribed: a buyer name
+   * and contact, an optional supplier, and one or more stock lines. A new sale
+   * is a DRAFT and RESERVES its stock — the live sheet says so in its own
+   * description ("Stock is reserved until payment is confirmed and the items are
+   * released"), and the row actions that release or cancel it only make sense
+   * against stock that is being held.
+   */
+  CREATE_SALE: {
+    req: {
+      buyerName?: string;
+      buyerContact?: string;
+      supplierId?: string;
+      items: Array<{ stockItemId: string; quantity: number }>;
+      actor?: string;
+    };
+    res: Success<{ sale: import('../types/admin').Sale }> & ApiEnvelope;
   };
 
   /* ── store checkout ──────────────────────────────────────────────────── */
@@ -1535,6 +1603,7 @@ export const GET_ACTIONS = [
   'GET_STUDENTS',
   'GET_CONFIG',
   'GET_COGNITO_ADMINS',
+  'GET_SCHOOLS',
   'GET_EXAM_CONFIG',
   'GET_DEMOTION_LOGS',
   // notifications, calendar and notices (D-64)
@@ -1603,6 +1672,7 @@ export const POST_ACTIONS = [
   'TRIGGER_ARCHIVE',
   'CREATE_ADMIN_ACCESS',
   'DELETE_ADMIN_ACCESS',
+  'ADD_SCHOOL',
   'UPDATE_ADMIN_STATUS',
   'REQUEST_ADMIN_PASSWORD_RESET',
   'CONFIRM_ADMIN_PASSWORD_RESET',
@@ -1709,6 +1779,7 @@ export const POST_ACTIONS = [
   'CREATE_BACKUP',
   /* Store checkout — see PLACE_STORE_ORDER. */
   'PLACE_STORE_ORDER',
+  'CREATE_SALE',
   'CONFIRM_STORE_ORDER',
   'RESOLVE_STORE_REFUND',
   'UPDATE_CART_ITEM',

@@ -2432,6 +2432,85 @@ const handlers: AdminHandlers = {
    * It is one transaction: every line is validated before any is reserved, so a
    * short order cannot half-place and still claim success.
    */
+  /**
+ * Raise a sale request.
+ *
+ * The three validations are the live sheet's own, in its own order and with its
+ * own wording — `CreateSaleDialog.handleSubmit` checks "at least one item",
+ * then "quantities must be greater than zero", then per-line availability — and
+ * they run BEFORE anything is written, so a rejected sale reserves nothing.
+ *
+ * A new sale is a DRAFT and reserves its stock: `inStock` is untouched, the
+ * quantity moves into `reserved`, and `available` falls with it. That is what
+ * makes the sheet's own promise true ("Stock is reserved until payment is
+ * confirmed and the items are released") and what makes the Release and Cancel
+ * row actions mean something.
+ */
+CREATE_SALE: (req) => {
+    const requested = Array.isArray(req.items) ? (req.items as Array<{ stockItemId?: unknown; quantity?: unknown }>) : [];
+    const items = requested
+      .filter((line) => trimmed(line.stockItemId as string))
+      .map((line) => ({
+        stockItemId: trimmed(line.stockItemId as string),
+        quantity: Math.floor(Number(line.quantity)),
+      }));
+
+    if (items.length === 0) return { status: 'error', message: 'Add at least one stock item to the sale.' };
+    if (items.some((item) => !(item.quantity > 0))) {
+      return { status: 'error', message: 'Quantities must be greater than zero.' };
+    }
+    /* Every line is checked before any is reserved. Reserving line 1 and then
+       discovering line 3 is short would leave stock held against a sale that
+       was never created. */
+    const resolved: Array<{ item: StockItem; quantity: number }> = [];
+    for (const line of items) {
+      const item = stock.find((s) => s.id === line.stockItemId);
+      if (!item) return { status: 'error', message: 'A stock item in this sale no longer exists.' };
+      if (line.quantity > item.available) {
+        return { status: 'error', message: `Only ${item.available} of "${item.name}" available.` };
+      }
+      resolved.push({ item, quantity: line.quantity });
+    }
+
+    const supplier = trimmed(req.supplierId)
+      ? suppliers.find((s) => s.id === trimmed(req.supplierId))
+      : undefined;
+    const total = resolved.reduce((sum, line) => sum + line.quantity * line.item.unitPrice, 0);
+
+    saleSeq += 1;
+    const sale = {
+      id: `SALE-${String(saleSeq).padStart(3, '0')}`,
+      invoiceNo: `INV-2026-${String(saleSeq).padStart(4, '0')}`,
+      buyerName: trimmed(req.buyerName) || 'Walk-in buyer',
+      buyerPhone: trimmed(req.buyerContact),
+      total,
+      status: 'DRAFT',
+      date: day(0),
+      createdBy: trimmed(req.actor) || 'Nicegene Technologies',
+      supplierName: supplier?.name ?? '',
+      lines: resolved.map((line) => ({
+        stockItemId: line.item.id,
+        name: line.item.name,
+        quantity: line.quantity,
+        unitPrice: line.item.unitPrice,
+      })),
+    };
+    sales.unshift(sale);
+    for (const line of resolved) {
+      line.item.reserved += line.quantity;
+      line.item.available = Math.max(0, line.item.available - line.quantity);
+      line.item.status =
+        line.item.available <= 0
+          ? 'OUT_OF_STOCK'
+          : line.item.available <= line.item.reorderLevel
+            ? 'LOW_STOCK'
+            : 'IN_STOCK';
+    }
+    store.sales.rows = asCollection(sales);
+    logAction(trimmed(req.actor) || 'Nicegene Technologies', 'CREATE', 'sales', sale.id);
+    return { ...ok(`Sale ${sale.invoiceNo} created. Stock reserved.`), sale };
+  },
+
   PLACE_STORE_ORDER: (req) => {
     const requested = Array.isArray(req.lines) ? (req.lines as Array<{ stockItemId?: unknown; quantity?: unknown }>) : [];
     if (requested.length === 0) return { status: 'error', message: 'Your cart is empty.' };

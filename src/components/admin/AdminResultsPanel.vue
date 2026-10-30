@@ -552,10 +552,10 @@ onMounted(load);
             <td>{{ row.admissionNo }}</td>
             <td>{{ row.sex }}</td>
             <td>{{ row.studentType }}</td>
-            <td class="ap-num"><input v-model.number="(entry!.rows[index] as ResultEntryRow).ca1" class="ap-input ap-results__mark" type="number" min="0" max="20" /></td>
-            <td class="ap-num"><input v-model.number="(entry!.rows[index] as ResultEntryRow).ca2" class="ap-input ap-results__mark" type="number" min="0" max="10" /></td>
-            <td class="ap-num"><input v-model.number="(entry!.rows[index] as ResultEntryRow).project" class="ap-input ap-results__mark" type="number" min="0" max="10" /></td>
-            <td class="ap-num"><input v-model.number="(entry!.rows[index] as ResultEntryRow).exam" class="ap-input ap-results__mark" type="number" min="0" max="60" /></td>
+            <td class="ap-num"><input v-model.number="(entry!.rows[index] as ResultEntryRow).ca1" class="ap-input ap-results__mark" type="number" :aria-label="`${row.surname} ${row.otherNames} — CA 1 mark`" min="0" max="20" /></td>
+            <td class="ap-num"><input v-model.number="(entry!.rows[index] as ResultEntryRow).ca2" class="ap-input ap-results__mark" type="number" :aria-label="`${row.surname} ${row.otherNames} — CA 2 mark`" min="0" max="10" /></td>
+            <td class="ap-num"><input v-model.number="(entry!.rows[index] as ResultEntryRow).project" class="ap-input ap-results__mark" type="number" :aria-label="`${row.surname} ${row.otherNames} — Project mark`" min="0" max="10" /></td>
+            <td class="ap-num"><input v-model.number="(entry!.rows[index] as ResultEntryRow).exam" class="ap-input ap-results__mark" type="number" :aria-label="`${row.surname} ${row.otherNames} — Exam mark`" min="0" max="60" /></td>
             <td class="ap-num">{{ row.total }}</td>
             <td class="ap-num">{{ row.total }}</td>
             <td>{{ row.grade }}</td>
@@ -760,9 +760,9 @@ onMounted(load);
         <tbody>
           <tr v-for="(band, index) in grading?.bands ?? []" :key="band.grade">
             <td>{{ band.grade }}</td>
-            <td class="ap-num"><input v-model.number="grading!.bands[index].minScore" class="ap-input ap-results__mark" type="number" min="0" max="100" /></td>
-            <td class="ap-num"><input v-model.number="grading!.bands[index].maxScore" class="ap-input ap-results__mark" type="number" min="0" max="100" /></td>
-            <td><input v-model="grading!.bands[index].label" class="ap-input" type="text" /></td>
+            <td class="ap-num"><input v-model.number="grading!.bands[index].minScore" class="ap-input ap-results__mark" type="number" :aria-label="`Grade ${band.grade} min score`" min="0" max="100" /></td>
+            <td class="ap-num"><input v-model.number="grading!.bands[index].maxScore" class="ap-input ap-results__mark" type="number" :aria-label="`Grade ${band.grade} max score`" min="0" max="100" /></td>
+            <td><input v-model="grading!.bands[index].label" class="ap-input" type="text" :aria-label="`Grade ${band.grade} label`" /></td>
           </tr>
         </tbody>
       </table>

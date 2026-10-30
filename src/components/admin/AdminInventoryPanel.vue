@@ -361,6 +361,156 @@ const loadQueue = async (): Promise<void> => {
   }
 };
 
+/* ── Create Sale ────────────────────────────────────────────────────────── */
+
+/**
+ * The live `/inventory/sales` sheet, transcribed.
+ *
+ * It was previously a button with no handler at all — the only dead control in
+ * the console, found by `tools/find-dead-controls.py`. It is rebuilt here from
+ * `CreateSaleDialog.tsx`: the same fields, the same three validations in the
+ * same order with the same wording, and the same promise in its description,
+ * which is load-bearing because it is why the Release and Cancel row actions
+ * make sense — a draft sale holds its stock.
+ */
+interface SaleLineDraft {
+  stockItemId: string;
+  quantity: string;
+}
+
+/**
+ * Stock and suppliers for the sale sheet's two selects.
+ *
+ * Loaded on open rather than with the sales list: the sales table does not need
+ * them, and the live sheet likewise loads suppliers and stock when it opens
+ * (`Promise.all([fetchJson(suppliers), fetchJson(stock)])` in its `useEffect`).
+ */
+const stock = ref<StockRow[]>([]);
+const suppliers = ref<Array<{ id: string; name: string }>>([]);
+
+const loadSaleOptions = async (): Promise<void> => {
+  try {
+    const [items, vendors] = await Promise.all([
+      callApi('LIST_ADMIN_RECORDS', { resource: 'stock', limit: 200 }),
+      callApi('LIST_ADMIN_RECORDS', { resource: 'suppliers', limit: 200 }),
+    ]);
+    if (items.status === 'success') stock.value = items.records as StockRow[];
+    if (vendors.status === 'success') {
+      suppliers.value = vendors.records as Array<{ id: string; name: string }>;
+    }
+  } catch {
+    /* The dialog reports its own failure; an empty select is better than a
+       panel-level error for a sheet the operator may not even open. */
+  }
+};
+
+const saleDialog = ref(false);
+const saleDraft = ref<{ buyerName: string; buyerContact: string; supplierId: string; lines: SaleLineDraft[] }>({
+  buyerName: '',
+  buyerContact: '',
+  supplierId: 'none',
+  lines: [{ stockItemId: '', quantity: '1' }],
+});
+const saleError = ref('');
+
+const openSaleDialog = (): void => {
+  saleError.value = '';
+  /* Re-seeded on open, as the live sheet re-seeds in its own `useEffect` — so
+     a cancelled sale leaves nothing behind for the next one. */
+  saleDraft.value = {
+    buyerName: '',
+    buyerContact: '',
+    supplierId: 'none',
+    lines: [{ stockItemId: '', quantity: '1' }],
+  };
+  saleDialog.value = true;
+  void loadSaleOptions();
+};
+
+const addSaleLine = (): void => {
+  saleDraft.value.lines.push({ stockItemId: '', quantity: '1' });
+};
+
+/** The live sheet disables removal on the last row, so a sale is never empty. */
+const removeSaleLine = (index: number): void => {
+  if (saleDraft.value.lines.length === 1) return;
+  saleDraft.value.lines.splice(index, 1);
+};
+
+/** Items that can be sold: in stock, and not the clinic's own shelf. */
+const sellableItems = computed<StockRow[]>(() =>
+  stock.value.filter((item) => item.available > 0 || sellableIds.value.has(item.id)),
+);
+
+/**
+ * Every id the form currently names, including a row whose quantity is 0.
+ *
+ * `sellableItems` filters on `available > 0`, which would silently drop an item
+ * from the select the moment a sale reserved all of it — leaving a select whose
+ * chosen value is no longer among its options. Anything named by the form stays
+ * offered so the selection cannot evaporate underneath the operator.
+ */
+const sellableIds = computed<Set<string>>(
+  () => new Set(saleDraft.value.lines.map((line) => line.stockItemId).filter(Boolean)),
+);
+
+/** The chosen item's price, for the per-line hint the live sheet shows. */
+const unitPriceOf = (stockItemId: string): number =>
+  stock.value.find((s) => s.id === stockItemId)?.unitPrice ?? 0;
+
+const saleTotal = computed(() =>
+  saleDraft.value.lines.reduce((sum, line) => {
+    const item = stock.value.find((s) => s.id === line.stockItemId);
+    return sum + (item ? item.unitPrice * (Number(line.quantity) || 0) : 0);
+  }, 0),
+);
+
+const submitSale = async (): Promise<void> => {
+  const items = saleDraft.value.lines
+    .filter((line) => line.stockItemId)
+    .map((line) => ({ stockItemId: line.stockItemId, quantity: Number(line.quantity) || 0 }));
+
+  /* The live sheet's own checks, in its own order, before anything is written. */
+  if (items.length === 0) {
+    saleError.value = 'Add at least one stock item to the sale.';
+    return;
+  }
+  if (items.some((item) => item.quantity <= 0)) {
+    saleError.value = 'Quantities must be greater than zero.';
+    return;
+  }
+  for (const item of items) {
+    const row = stock.value.find((s) => s.id === item.stockItemId);
+    if (row && item.quantity > row.available) {
+      saleError.value = `Only ${row.available} of "${row.name}" available.`;
+      return;
+    }
+  }
+
+  busy.value = true;
+  saleError.value = '';
+  try {
+    const data = await callApi('CREATE_SALE', {
+      buyerName: saleDraft.value.buyerName.trim() || undefined,
+      buyerContact: saleDraft.value.buyerContact.trim() || undefined,
+      supplierId: saleDraft.value.supplierId !== 'none' ? saleDraft.value.supplierId : undefined,
+      items,
+      actor: session.actor(),
+    });
+    if (data.status !== 'success') throw new Error(data.message || 'Could not create the sale.');
+    banner.value = `${data.sale.invoiceNo} created. Stock reserved.`;
+    saleDialog.value = false;
+    /* The sales list gained a row and the stock levels moved, so both are read
+       again. Reloading only the list would leave the stock page showing
+       pre-reservation availability. */
+    await Promise.all([loadSales(), loadSaleOptions()]);
+  } catch (e) {
+    saleError.value = e instanceof Error ? e.message : 'Could not create the sale.';
+  } finally {
+    busy.value = false;
+  }
+};
+
 /** Release or cancel a sale — the two status changes the live dialog offers. */
 const setSaleStatus = async (row: SaleRow, status: 'RELEASED' | 'CANCELLED'): Promise<void> => {
   busyRecord.value = row.id;
@@ -730,7 +880,12 @@ watch(() => props.module.id, loadActive);
     @dismiss="banner = ''"
   >
     <template #actions>
-      <button v-if="permitted('inventory.sales.create')" type="button" class="ap-btn ap-btn--primary">
+      <button
+        v-if="permitted('inventory.sales.create')"
+        type="button"
+        class="ap-btn ap-btn--primary"
+        @click="openSaleDialog"
+      >
         Create Sale
       </button>
     </template>
@@ -940,8 +1095,91 @@ watch(() => props.module.id, loadActive);
     </AdminDialog>
   </AdminModuleShell>
 
-  <!-- ── everything else: the generic list ──────────────────────────────── -->
+  <!-- ── everything else: the generic list ────────────────────────────────
+       The `v-else` of the chain above, so it must stay adjacent to it: the Vue
+       compiler rejects a `v-else` with anything in between. That is why the
+       Create Sale dialog below sits after this element and not beside the
+       branch that opens it. -->
   <AdminResourcePanel v-else v-model:can="can" :module="module" />
+
+  <!-- ── Create Sale ──────────────────────────────────────────────────────
+       Outside the `v-else-if` chain on purpose. Inside it, the dialog would be
+       unmounted by the shell branch that is not active, so opening it from the
+       sales panel would work but the dialog would be destroyed the moment the
+       operator moved away — and a dialog that renders only while its opener is
+       on screen is a dialog with a missing case. -->
+  <AdminDialog
+    :open="saleDialog"
+    title="Create Sale"
+    kind="edit"
+    confirm-label="Create Sale"
+    :busy="busy"
+    @close="saleDialog = false"
+    @confirm="submitSale"
+  >
+    <p class="ap-inline-note">
+      Raise a new sale request. Stock is reserved until payment is confirmed and the items are released.
+    </p>
+
+    <label class="ap-field">
+      <span class="ap-field__label">Buyer Name</span>
+      <input v-model="saleDraft.buyerName" class="ap-input" type="text" placeholder="e.g. John Doe" />
+    </label>
+    <label class="ap-field">
+      <span class="ap-field__label">Buyer Contact</span>
+      <input v-model="saleDraft.buyerContact" class="ap-input" type="text" placeholder="Phone or email" />
+    </label>
+    <label class="ap-field">
+      <span class="ap-field__label">Supplier</span>
+      <select v-model="saleDraft.supplierId" class="ap-input">
+        <option value="none">No supplier</option>
+        <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
+      </select>
+    </label>
+
+    <h4 class="ap-band">Items</h4>
+    <div v-for="(line, index) in saleDraft.lines" :key="index" class="ap-seat-row" data-cols="3">
+      <label class="ap-field">
+        <span class="ap-field__label">Stock item</span>
+        <select v-model="line.stockItemId" class="ap-input">
+          <option value="">Choose a stock item</option>
+          <option v-for="item in sellableItems" :key="item.id" :value="item.id">
+            {{ item.name }} ({{ item.available }} available)
+          </option>
+        </select>
+        <span v-if="unitPriceOf(line.stockItemId)" class="ap-field__hint">
+          Unit price: {{ money(unitPriceOf(line.stockItemId)) }}
+        </span>
+      </label>
+      <label class="ap-field">
+        <span class="ap-field__label">Quantity</span>
+        <input
+          v-model="line.quantity"
+          class="ap-input"
+          type="number"
+          min="1"
+          :aria-label="'Quantity for item ' + (index + 1)"
+        />
+      </label>
+      <button
+        type="button"
+        class="ap-btn ap-btn--xs ap-btn--danger"
+        :disabled="saleDraft.lines.length === 1"
+        :aria-label="'Remove item ' + (index + 1)"
+        @click="removeSaleLine(index)"
+      >
+        Remove
+      </button>
+    </div>
+    <button type="button" class="ap-btn ap-btn--xs" @click="addSaleLine">Add Item</button>
+
+    <p class="ap-total">
+      <span>Total Amount</span>
+      <strong>{{ money(saleTotal) }}</strong>
+    </p>
+
+    <p v-if="saleError" class="ap-form__error" role="alert">{{ saleError }}</p>
+  </AdminDialog>
 </template>
 
 <style scoped>

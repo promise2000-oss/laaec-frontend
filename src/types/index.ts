@@ -254,6 +254,31 @@ export interface AdminAccount {
 }
 
 /**
+ * An archdiocesan school (PRD D23).
+ *
+ * The origin hardcodes ten schools in `SCHOOL_NAMES` / `SCHOOL_ORDER` (see
+ * `src/lib/console.ts`). That list is the SEED for this record: the ten served
+ * schools are always present, and a super administrator can add more at
+ * runtime from the `/admin/` Schools panel. `Code` is the short SchoolID every
+ * console already keys on (SFC, SGC, …); `Name` is the display name shown in
+ * the school dropdowns and on the population charts.
+ *
+ * `builtin` marks the ten seeded schools so the panel can label them and, if a
+ * delete is ever added, protect them the way the origin protects the original
+ * School Admin account.
+ */
+export interface SchoolRecord {
+  /** Short SchoolID, uppercased: SFC, SGC, or a newly added code. */
+  Code: string;
+  /** Display name shown in the school dropdowns. */
+  Name: string;
+  /** Optional address, carried for the school's profile row. */
+  Address?: string;
+  /** True for the ten schools hardcoded on the origin. */
+  builtin?: boolean;
+}
+
+/**
  * Scheduled paper inside the live window. Field names are the union observed
  * in `normalizeLivePaper` (origin-pages/login.html): identity aliases are
  * tried in order, then time aliases. Duration and EndTime are RF-41/RF-43.
@@ -502,6 +527,14 @@ export const STORAGE_KEYS = {
   AdminRole: 'AdminRole',
   AdminUsername: 'AdminUsername',
   AdminSessionID: 'AdminSessionID',
+  /**
+   * The 33 school roles this session holds, as a JSON array of their live names.
+   *
+   * Separate from `AdminRole` because the two answer different questions: the
+   * claim gates the console, these gate what is reachable inside it. A session
+   * carries both, and `effectivePermissions` unions the two axes.
+   */
+  AdminSchoolRoles: 'AdminSchoolRoles',
   activeStudent: 'activeStudent',
   selectedSubject: 'selectedSubject',
   studentToken: 'studentToken',

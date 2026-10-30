@@ -178,6 +178,7 @@ const ADMIN_GROUPS: NavGroup[] = [
       { id: 'past-questions', label: 'Past Questions', icon: 'book', permission: 'questions.read' },
       { id: 'results', label: 'Results Center', icon: 'chart', permission: 'results.read' },
       { id: 'student-directory', label: 'Student Directory', icon: 'users', permission: 'students.read' },
+      { id: 'schools', label: 'Schools', icon: 'building', permission: 'schools.read' },
       { id: 'admins', label: 'School Admins', icon: 'shield', permission: 'admins.read' },
       { id: 'health', label: 'System Health', icon: 'cog', permission: 'system.read' },
     ],
@@ -195,27 +196,26 @@ const ADMIN_GROUPS: NavGroup[] = [
     ],
   },
   {
+    /*
+     * The CBT/exam cleanup. Departments, designations, staff attendance, leave,
+     * HR queries and awards are REMOVED: their permissions (departments.*,
+     * designations.*, attendance.*, leave.view/approve, queries.view,
+     * awards.read) are Saint Finbarr's human-resources ERP, not CBT/exam
+     * operations, and SUPER_ADMIN no longer holds them. Only the Staff List
+     * survives, gated on `staff.read`, which SUPER_ADMIN still holds through
+     * CENTRAL_ADMIN's cross-school staff onboarding (D-55).
+     */
     title: 'Staff & HR',
-    items: [
-      { id: 'staff', label: 'Staff List', icon: 'users', permission: 'staff.read' },
-      { id: 'departments', label: 'Departments', icon: 'file', permission: 'departments.read' },
-      { id: 'designations', label: 'Designations', icon: 'file', permission: 'designations.read' },
-      { id: 'staff-attendance', label: 'Staff Attendance', icon: 'book', permission: 'attendance.read' },
-      { id: 'staff-attendance-report', label: 'Staff Attendance Report', icon: 'file', permission: 'attendance.read' },
-      { id: 'leave', label: 'Leave', icon: 'calendar', permission: 'leave.view' },
-      { id: 'leave-approvals', label: 'Leave Approvals', icon: 'check', permission: 'leave.approve' },
-      { id: 'hr-queries', label: 'HR Queries', icon: 'inbox', permission: 'queries.view' },
-      { id: 'awards', label: 'Awards', icon: 'chart', permission: 'awards.read' },
-    ],
+    items: [{ id: 'staff', label: 'Staff List', icon: 'users', permission: 'staff.read' }],
   },
   {
+    /*
+     * Student attendance and the parent list are REMOVED (attendance.* and
+     * parents.read are school-management, not CBT/exam). Only the Student List
+     * survives — students are the exam candidates.
+     */
     title: 'Students & Parents',
-    items: [
-      { id: 'students', label: 'Student List', icon: 'users', permission: 'students.read' },
-      { id: 'student-attendance', label: 'Student Attendance', icon: 'book', permission: 'attendance.read' },
-      { id: 'student-attendance-report', label: 'Student Attendance Report', icon: 'chart', permission: 'attendance.read' },
-      { id: 'parents', label: 'Parent List', icon: 'users', permission: 'parents.read' },
-    ],
+    items: [{ id: 'students', label: 'Student List', icon: 'users', permission: 'students.read' }],
   },
   {
     title: 'Academic Settings',
@@ -230,73 +230,18 @@ const ADMIN_GROUPS: NavGroup[] = [
       { id: 'subject-teachers', label: 'Subject Teachers', icon: 'users', permission: 'academic.read' },
     ],
   },
-  {
-    title: 'Inventory',
-    items: [
-      { id: 'stock', label: 'Stock Items', icon: 'book', permission: 'inventory.stock.read' },
-      { id: 'inventory-categories', label: 'Item Categories', icon: 'file', permission: 'inventory.read' },
-      { id: 'suppliers', label: 'Suppliers', icon: 'file', permission: 'inventory.suppliers.read' },
-      { id: 'assets', label: 'Assets', icon: 'file', permission: 'inventory.assets.read' },
-      { id: 'inventory-reports', label: 'Reports', icon: 'chart', permission: 'inventory.stock.read' },
-      { id: 'inventory-settings', label: 'Settings', icon: 'cog', permission: 'system.settings.update' },
-      { id: 'clinic-store', label: 'Clinic Store', icon: 'book', permission: 'inventory.clinic.read' },
-      { id: 'sales', label: 'Sales & Invoicing', icon: 'chart', permission: 'inventory.sales.read' },
-    ],
-  },
-  {
-    title: 'Disciplinary',
-    items: [
-      { id: 'disciplinary-reports', label: 'Case Reports', icon: 'file', permission: 'disciplinary.cases.view' },
-      { id: 'disciplinary-launch-case', label: 'Launch Case', icon: 'pen', permission: 'disciplinary.cases.launch' },
-      { id: 'disciplinary-incidents', label: 'Incidents', icon: 'book', permission: 'disciplinary.read' },
-      { id: 'disciplinary-committees', label: 'Committee', icon: 'users', permission: 'disciplinary.read' },
-    ],
-  },
-  {
-    title: 'Counselling',
-    items: [
-      { id: 'counselling-cases', label: 'View Cases', icon: 'users', permission: 'counselling.cases.view' },
-      { id: 'counselling-book-session', label: 'Book Session', icon: 'pen', permission: 'counselling.cases.book' },
-      { id: 'counselling-reports', label: 'Session Reports', icon: 'file', permission: 'counselling.reports.view' },
-      { id: 'counselling-committee', label: 'Committee', icon: 'users', permission: 'counselling.committees.view' },
-    ],
-  },
-  {
-    title: 'Store',
-    items: [
-      { id: 'store', label: 'Browse Store', icon: 'book', permission: 'store.browse' },
-      { id: 'cart', label: 'My Cart', icon: 'file', permission: 'store.cart.manage' },
-      { id: 'orders', label: 'My Orders', icon: 'file', permission: 'store.orders.read' },
-      { id: 'queue', label: 'Confirmation Queue', icon: 'inbox', permission: 'store.queue.read' },
-      {
-        id: 'refund-queue',
-        label: 'Refund Queue',
-        icon: 'inbox',
-        permission: 'store.queue.read',
-        /* The live app models Refund Queue as the same route with
-           `?status=REFUND_PENDING`, not a second page. Carrying the query here
-           keeps it one queue rather than two lists that can disagree. */
-        route: '/admin/?panel=queue&status=REFUND_PENDING',
-      },
-    ],
-  },
-  {
-    title: 'School Fees',
-    items: [
-      { id: 'fee-breakdown', label: 'Fee Breakdown', icon: 'file', permission: 'schoolfees.read' },
-      { id: 'fee-categories', label: 'Fee Categories', icon: 'file', permission: 'schoolfees.read' },
-      { id: 'fee-items', label: 'Fee Items', icon: 'file', permission: 'schoolfees.read' },
-      { id: 'fee-payments', label: 'Payment History', icon: 'file', permission: 'schoolfees.read' },
-      { id: 'fee-reports', label: 'Fee Reports', icon: 'chart', permission: 'schoolfees.read' },
-    ],
-  },
-  {
-    title: 'Student Wallet',
-    items: [
-      { id: 'wallets', label: 'Wallets', icon: 'file', permission: 'wallet.view' },
-      { id: 'wallet-reports', label: 'Wallet Reports', icon: 'chart', permission: 'wallet.view' },
-    ],
-  },
+  /*
+   * REMOVED wholesale with the CBT/exam cleanup: Inventory, Disciplinary,
+   * Counselling, Store, School Fees and Student Wallet.
+   *
+   *  - Inventory, Store, School Fees and Student Wallet (inventory.*, store.*,
+   *    schoolfees.*, wallet.*) are Saint Finbarr's commerce/asset ERP.
+   *  - Disciplinary and Counselling are the school-welfare ERP. Their entries
+   *    are dropped from THIS rail only; the teacher portal keeps its own
+   *    counselling/disciplinary panels, and SUPER_ADMIN still holds those
+   *    codes via the TEACHER union (it must remain a superset), so removing
+   *    the nav entries is what takes them off the admin console.
+   */
   {
     title: 'Results Management',
     items: [
@@ -498,13 +443,25 @@ export const navRoleForConsole = (consoleName: string, sessionRole: string): str
  * Filtering runs against the *effective* permission set — granted permissions
  * unioned with the role defaults — so a session whose grants have not arrived
  * yet still sees its own console instead of an empty rail.
+ *
+ * `ignoreSuperAdmin` exists for exactly one caller: the roles page's preview.
+ * That short-circuit is why previewing a school role needs to opt out of it — a
+ * super administrator is exempt from the filter, so filtering by their codes
+ * would be a no-op and the preview would show the same rail it started with. The
+ * flag is explicit and named rather than inferred from the permission list,
+ * because "this session is a super admin" and "ignore that this session is a
+ * super admin" are different requests and conflating them would silently
+ * un-exempt every rail in the app.
  */
 export const filterNav = (
   nav: RoleNav,
   permissions: readonly string[],
   role: string,
+  options: { ignoreSuperAdmin?: boolean } = {},
 ): RoleNav => {
-  if (String(role || '').trim().toUpperCase() === 'SUPER_ADMIN') return nav;
+  if (!options.ignoreSuperAdmin && String(role || '').trim().toUpperCase() === 'SUPER_ADMIN') {
+    return nav;
+  }
 
   const visible = (item: NavItem): boolean =>
     !item.permission || permissions.includes(item.permission);

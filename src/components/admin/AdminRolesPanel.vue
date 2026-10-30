@@ -20,21 +20,107 @@
  * live dialog's exact layout is not observable without opening it and selecting
  * a role, and inventing a layout would be a guess. Recorded in
  * feature-inventory.md as a documented simplification, not as parity.
+ *
+ * THE TWO EXTRA CONTROLS: HOLD, AND PREVIEW
+ * -----------------------------------------
+ * Assign/unassign act on OTHER users, which is what the live toolbar does. That
+ * left the 33 roles decorative here: a table you can look at, whose rows you can
+ * assign to other accounts, but which never changed what the operator in front
+ * of the console could reach — because a session here carries one LAEC claim and
+ * nothing else. So the school roles are now a second authorisation axis, and the
+ * roles page is the surface that edits it.
+ *
+ * "Hold this role" grants a role to THIS session, taking effect immediately.
+ *
+ * "Preview this role" is what makes the axis observable, and it exists because of
+ * a structural fact rather than as a convenience: `/admin/` is SUPER_ADMIN-only
+ * (router guard, D-11), and a super administrator holds a superset of every
+ * other role by design. So holding Bursary cannot narrow a super admin's rail —
+ * correctly, because a super admin is entitled to everything. A preview applies
+ * the chosen role's grants INSTEAD of the session's own, and says so plainly, so
+ * the 33 roles can be read as what they are: what each one would reach.
+ *
+ * Neither control invents behaviour the live app lacks. The live `/permissions`
+ * page has a "View by role" tab whose whole purpose is answering this question;
+ * a preview that showed the same thing as a filtered rail is that tab, expressed
+ * in the vocabulary of this console. What is NOT reproduced is any claim about
+ * what the live portal renders for a non-super-administrator, because no
+ * non-admin session was ever signed in there — see
+ * `docs/saint-finbarrs-admin/roles-and-permissions.md`.
  */
 import { computed, onMounted, ref } from 'vue';
 import { callApi } from '../../api';
 import AdminDialog from './AdminDialog.vue';
 import AdminModuleShell from './AdminModuleShell.vue';
 import { useAdminSession } from './useAdminSession';
+import { useSessionStore } from '../../stores/session';
+import { SCHOOL_ROLE_PERMISSIONS } from '../../types/admin-registry';
 import type { AdminModule } from '../../types/admin-registry';
 
 const props = defineProps<{ module: AdminModule }>();
 const can = defineModel<((permission?: string | null) => boolean) | null>('can', { default: null });
 
 const session = useAdminSession();
+const sessionStore = useSessionStore();
 const permitted = (permission?: string): boolean => {
   if (!permission) return true;
   return can.value ? can.value(permission) : true;
+};
+
+/**
+ * The school roles this session holds, and the count each one contributes.
+ *
+ * Two numbers per role, and both are shown because they disagree. `permissions`
+ * is the live page's observed count for that role; `granted` is what this console
+ * actually hands the session, derived from the role's module membership. Where
+ * they differ the row says so rather than quietly rendering the local figure in
+ * the column headed as the live one's.
+ */
+const roleGrants = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = {};
+  for (const [name, codes] of Object.entries(SCHOOL_ROLE_PERMISSIONS)) {
+    counts[name] = codes.length;
+  }
+  return counts;
+});
+
+const holdsRole = (name: string): boolean => sessionStore.schoolRoles.includes(name);
+
+/**
+ * Grant or revoke a role for this session.
+ *
+ * Deliberately not going through `ASSIGN_ROLE`. That action edits a row on the
+ * user record, which is the live behaviour and is kept for the toolbar — but it
+ * cannot change what the CURRENT operator can do, because the mock's roster is
+ * not what this session's permissions are read from. Going through the store's
+ * `setSchoolRole` is what makes the rail change in front of the operator, which
+ * is the entire point of the control.
+ */
+const toggleHeldRole = (name: string): void => {
+  const held = holdsRole(name);
+  sessionStore.setSchoolRole(name, !held);
+  banner.value = held
+    ? `Revoked "${name}" from this session.`
+    : `Holding "${name}": ${roleGrants.value[name] ?? 0} permission(s) granted to this session.`;
+};
+
+/**
+ * Whether the rail is currently previewing this role.
+ *
+ * Reading the name out of the session store rather than keeping a local copy is
+ * what keeps the rail and this page in step: `navPermissions` in the store
+ * decides the rail, so a second copy of the previewed name here would be a
+ * second thing to keep in step and would drift from what is rendered.
+ */
+const previewing = (name: string): boolean => sessionStore.previewRole === name;
+
+const togglePreview = (name: string): void => {
+  const next = previewing(name) ? '' : name;
+  sessionStore.setPreviewRole(next);
+  banner.value = next
+    ? `Previewing the rail as "${next}" alone (${roleGrants.value[next] ?? 0} permission(s)). ` +
+      'This is a preview — the transport still acts as your own claim does.'
+    : 'Preview cleared. The rail is your own again.';
 };
 
 interface RoleRow extends Record<string, unknown> {
@@ -258,6 +344,13 @@ onMounted(load);
       </button>
     </template>
 
+    <p v-if="sessionStore.previewRole" class="ap-callout">
+      <strong>Previewing the rail as “{{ sessionStore.previewRole }}”.</strong>
+      Only that role's grants are being shown. Your own claim still governs every
+      action behind these pages, so this narrows what is offered and not what is
+      permitted.
+    </p>
+
     <div class="ap-table-wrap">
       <table class="ap-table">
         <caption class="ap-table__caption">{{ roles.length }} roles</caption>
@@ -266,21 +359,53 @@ onMounted(load);
             <th scope="col">Role</th>
             <th scope="col" class="ap-num">Users</th>
             <th scope="col" class="ap-num">Permissions</th>
+            <th scope="col"><span class="ap-sr">Actions</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="role in roles" :key="role.id">
+          <tr v-for="role in roles" :key="role.id" :class="{ 'ap-row--held': holdsRole(role.name) }">
             <td>
               <div class="ap-identity">
                 <span class="ap-avatar" aria-hidden="true">{{ role.name.slice(0, 2).toUpperCase() }}</span>
                 <span class="ap-identity__text">
-                  <span class="ap-identity__name">{{ role.name }}</span>
+                  <span class="ap-identity__name">
+                    {{ role.name }}
+                    <span v-if="holdsRole(role.name)" class="ap-badge ap-badge--soft">Held</span>
+                  </span>
                   <span v-if="role.description" class="ap-identity__sub">{{ role.description }}</span>
                 </span>
               </div>
             </td>
             <td class="ap-num">{{ role.users }}</td>
-            <td class="ap-num">{{ role.permissions }}</td>
+            <td class="ap-num">
+              {{ role.permissions }}
+              <span
+                v-if="roleGrants[role.name] !== undefined && roleGrants[role.name] !== role.permissions"
+                class="ap-cell__note"
+                :title="'The live role holds ' + role.permissions + '. This console grants ' + roleGrants[role.name] + ' from the role’s module membership — see roles-and-permissions.md.'"
+              >
+                {{ roleGrants[role.name] }} here
+              </span>
+            </td>
+            <td class="ap-table__actions">
+              <button
+                type="button"
+                class="ap-btn ap-btn--xs"
+                :class="{ 'ap-btn--primary': !holdsRole(role.name) }"
+                @click="toggleHeldRole(role.name)"
+              >
+                {{ holdsRole(role.name) ? 'Revoke from this session' : 'Hold this role' }}
+              </button>
+              <button
+                type="button"
+                class="ap-btn ap-btn--xs"
+                :class="{ 'ap-btn--primary': previewing(role.name) }"
+                :aria-pressed="previewing(role.name)"
+                @click="togglePreview(role.name)"
+              >
+                {{ previewing(role.name) ? 'Clear preview' : 'Preview this role' }}
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>

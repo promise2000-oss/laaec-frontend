@@ -16,10 +16,89 @@
  * origin's global rules inside `.page-admin` would otherwise reach into a panel
  * they were not written for.
  *
- * Everything here is deliberately narrow: each rule names `.ap-admin-panel` (the
- * wrapper the view mounts around a module) or one `ap-` class. Nothing outside
- * that boundary is touched, so the origin panels cannot regress.
+ * THE ADMIN PANEL DESIGN TOKENS
+ * ------------------------------
+ * `components/admin/admin-panel.css` carried 27 distinct colour literals across
+ * 91 uses — `#5b6472` alone 17 times, `#d7dee8` 16. Those are the values that
+ * make a design system either one or a collection of components: when the same
+ * grey is written out seventeen times it is seventeen chances to change one of
+ * them, and nothing in the build fails when that happens.
+ *
+ * They are defined HERE rather than in `admin-panel.css` for a reason worth
+ * stating, because the obvious place does not work: `admin-panel.css` is
+ * `@import`ed into each panel's `<style scoped>` block, and Vue rewrites a scoped
+ * selector to carry the component's data attribute. A `:root` custom-property
+ * declaration in that file would compile to `:root[data-v-abc123]`, which matches
+ * nothing. This stylesheet is imported globally, so `:root` here is the real one.
+ *
+ * `admin-panel.css` then reads `var(--ap-*, <the same literal>)`. The literal
+ * stays as the fallback deliberately: it is what makes the value identical
+ * whether or not this sheet has loaded, so promoting a colour to a token cannot
+ * change what is rendered.
+ *
+ * Nothing here changes a colour. It changes where each colour is *written*.
  */
+
+:root {
+  /* Surfaces */
+  --ap-surface: #fff;
+  --ap-surface-soft: #f7f9fc;
+  --ap-surface-sunken: #eef2f7;
+  --ap-surface-tint: #f2f6fb;
+  --ap-surface-hint: #f2f7fd;
+
+  /* Lines */
+  --ap-line: #d7dee8;
+  --ap-line-strong: #cdd6e3;
+  --ap-line-accent: #bcd6f0;
+
+  /* Text */
+  --ap-text: #1f2933;
+  --ap-text-strong: #3b4553;
+  --ap-text-muted: #5b6472;
+  --ap-text-faint: #45505f;
+
+  /* Accent — the console's blue, used for focus, links and primary actions */
+  --ap-accent: #16457c;
+  --ap-accent-deep: #123a63;
+  --ap-accent-hover: #1c4e80;
+  --ap-accent-soft: #eaf2fb;
+  --ap-focus: #1c4e80;
+
+  /* Status */
+  --ap-success: #14532d;
+  --ap-success-tint: #e6f6ed;
+  --ap-success-soft: #eefaf3;
+  --ap-success-line: #a7d8bf;
+  --ap-warning: #8a6104;
+  --ap-warning-soft: #fdf3dd;
+  --ap-danger: #8f2a2a;
+  --ap-danger-strong: #a83232;
+  --ap-danger-soft: #fdf3f3;
+  --ap-danger-tint: #fbe9e9;
+  --ap-danger-line: #f0c8c8;
+  --ap-caution: #c8a24a;
+
+  /*
+   * The names `admin-panel.css` was already reaching for.
+   *
+   * `--text-muted`, `--laec-line`, `--laec-blue` and `--laec-accent` appeared 42
+   * times in that file and were defined nowhere, so every one of those uses fell
+   * through to its own inline fallback — forty-two separate copies of the same
+   * four colours, and nothing to change if the theme moved. They are declared
+   * here as aliases of the tokens above, so the existing call sites resolve
+   * through the system without being rewritten, and each keeps its literal
+   * fallback so the value is identical either way.
+   */
+  --text-muted: var(--ap-text-muted, #5b6472);
+  --laec-line: var(--ap-line, #d7dee8);
+  --laec-blue: var(--ap-focus, #1c4e80);
+  --laec-accent: var(--ap-caution, #c8a24a);
+}
+
+/* Everything below this line names `.ap-admin-panel` (the wrapper the view mounts
+ * around a module) or one `ap-` class. Nothing outside that boundary is touched,
+ * so the origin panels cannot regress. */
 
 /* The module wrapper is a plain block. The origin's `.tab-panel` rules are
    `display:none` / `display:block`, which is right; what it does not set is a
@@ -120,6 +199,110 @@
 .page-admin .ap-admin-panel button:focus-visible {
   outline: 2px solid var(--laec-blue, #1c4e80);
   outline-offset: 1px;
+}
+
+/* ── checkbox / radio primitive ───────────────────────────────────────────
+ *
+ * WHY THIS IS AT `.page-admin` AND NOT UNDER `.ap-admin-panel`
+ *
+ * The origin stylesheet has one element-scoped rule for every field in the
+ * console (admin-page.css:702):
+ *
+ *     .page-admin input, .page-admin select { width: 100%; padding: 13px 14px; … }
+ *
+ * It is written for the origin's own text fields and was never narrowed to
+ * them, so it also lands on `input[type=checkbox]`. The block above that
+ * neutralises the stretch for the text-ish types is keyed on `.ap-admin-panel`
+ * and lists each type explicitly — `checkbox` and `radio` are not on that list,
+ * so nothing overrode it. A checkbox inside `.ap-check` therefore rendered at
+ * `width: 100%` of the flex row: measured 102.6px wide by 13px tall in the
+ * permissions dialog, which is what made the boxes read as detached from their
+ * labels rather than adjacent to them.
+ *
+ * Dialogs are the reason this has to be keyed on `.page-admin` rather than on
+ * `.ap-admin-panel`: `.ap-dialog` is a sibling overlay, so a dialog opened from
+ * inside a panel is not a descendant of `.ap-admin-panel` at all, and a rule
+ * scoped that way would miss every checkbox in every dialog.
+ *
+ * The control is rebuilt from `appearance: none` rather than merely un-stretched
+ * so the checked, indeterminate and focus states are the console's own tokens
+ * instead of whatever the host platform paints. Indeterminate matters here: the
+ * permissions matrix's "select all" is genuinely tri-state — no permission in a
+ * group granted, some granted, all granted — and a native checkbox cannot show
+ * the middle state without JS.
+ */
+.page-admin input[type='checkbox'],
+.page-admin input[type='radio'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  max-width: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--ap-line-strong, #cdd6e3);
+  background: var(--ap-surface, #fff);
+  cursor: pointer;
+  /* The origin's focus rule lifts the control by 1px on focus. That reads as a
+     jump on a 18px box and shifts the label with it, so it is reset here and
+     replaced by a ring that does not move the control. */
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.page-admin input[type='checkbox'] { border-radius: 6px; }
+.page-admin input[type='radio'] { border-radius: 50%; }
+
+.page-admin input[type='checkbox']:hover:not(:disabled),
+.page-admin input[type='radio']:hover:not(:disabled) {
+  border-color: var(--ap-focus, #1c4e80);
+}
+
+/* The tick and the dot are drawn with one box-shadow so the element stays a
+   single focusable input with no pseudo-element of its own to inherit the
+   origin's `font` reset into. */
+.page-admin input[type='checkbox']:checked,
+.page-admin input[type='checkbox']:indeterminate {
+  background: var(--ap-accent, #16457c);
+  border-color: var(--ap-accent, #16457c);
+}
+
+.page-admin input[type='checkbox']:checked {
+  background-image: linear-gradient(45deg, transparent 46%, #fff 46%, #fff 54%, transparent 54%),
+    linear-gradient(-45deg, transparent 46%, #fff 46%, #fff 54%, transparent 54%);
+  background-size: 6px 6px, 6px 6px;
+  background-position: 3px 9px, 9px 9px;
+  background-repeat: no-repeat;
+}
+
+.page-admin input[type='checkbox']:indeterminate {
+  background-image: linear-gradient(#fff, #fff);
+  background-size: 10px 2px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.page-admin input[type='radio']:checked {
+  border-color: var(--ap-accent, #16457c);
+  box-shadow: inset 0 0 0 4px var(--ap-surface, #fff);
+  background: var(--ap-accent, #16457c);
+}
+
+.page-admin input[type='checkbox']:focus-visible,
+.page-admin input[type='radio']:focus-visible {
+  outline: none;
+  transform: none;
+  border-color: var(--ap-focus, #1c4e80);
+  box-shadow: 0 0 0 3px rgba(28, 78, 128, 0.28);
+}
+
+.page-admin input[type='checkbox']:disabled,
+.page-admin input[type='radio']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--ap-surface-sunken, #eef2f7);
 }
 
 /* Narrow viewports: the same treatment the origin panels get (D-59), so the module

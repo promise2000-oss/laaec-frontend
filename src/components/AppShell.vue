@@ -43,6 +43,11 @@ const ICONS: Record<string, string> = {
   calendar: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/></svg>',
   chart: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 20v-6M12.5 20V9M17 20v-9"/></svg>',
   shield: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 19 6v6c0 4-3 7-7 8.5C8 19 5 16 5 12V6Z"/><path d="m9 12 2 2 4-4"/></svg>',
+  /* `building` was added with the archdiocesan Schools registry (D23 runtime
+     extension), whose rail needs a school/institution glyph distinct from
+     `users`, which already means "Student Directory" here. Same 24-box, 1.7
+     stroke and 18px scale as every other icon in this map. */
+  building: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20.5V6a1.5 1.5 0 0 1 1.5-1.5h7A1.5 1.5 0 0 1 14 6v14.5"/><path d="M14 10h4.5A1.5 1.5 0 0 1 20 11.5v9"/><path d="M2.5 20.5h19"/><path d="M7 8h4M7 11.5h4M7 15h4M16.5 13.5h1M16.5 17h1"/></svg>',
   cog: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.5 7.5l2 1.2M17.5 15.3l2 1.2M4.5 16.5l2-1.2M17.5 8.7l2-1.2"/></svg>',
   check: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg>',
   inbox: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 13 6 5.5h12L20.5 13v5a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z"/><path d="M3.5 13H9a3 3 0 0 0 6 0h5.5"/></svg>',
@@ -217,6 +222,15 @@ const followNotification = (item: PortalNotification): void => {
 const railCollapsed = ref(false);
 const drawerOpen = ref(false);
 
+/**
+ * The rail's id, so the burger can say what it controls.
+ *
+ * One constant rather than a literal in two places: `aria-controls` pointing at
+ * an id that does not exist is worse than omitting it, and that is exactly what
+ * happens when the id is written twice and one copy drifts.
+ */
+const RAIL_ID = 'app-rail-nav';
+
 /* ── anchored popups (D-74) ────────────────────────────────────────────
  * Both panels are teleported to <body> and positioned from their trigger's
  * rect. src/lib/useAnchoredPopup.ts documents why: inside `.app-topbar`
@@ -267,6 +281,23 @@ const applyMode = (): void => {
   mode.value = w >= WIDE ? 'wide' : w >= NARROW ? 'icons' : 'drawer';
   if (mode.value !== 'drawer') drawerOpen.value = false;
 };
+
+/**
+ * Whether the rail shows its labels.
+ *
+ * True for the wide rail and — the case worth stating — for the MOBILE DRAWER
+ * too. The drawer is 272px wide, so there is room for the text, and it was
+ * rendering as a column of unlabelled icons: the only thing naming each item was
+ * a `title` attribute, which a screen reader will read but a touch user will
+ * never see, because there is no hover on a phone. An icon rail at 68px is a
+ * deliberate density choice; an icon-only drawer at 272px is just missing text.
+ *
+ * `icons` mode (the rail collapsed to 68px between 768px and 1200px) still hides
+ * labels, and that is where `title` carries them.
+ */
+const labelsVisible = computed(
+  () => (mode.value === 'wide' && !railCollapsed.value) || mode.value === 'drawer',
+);
 
 const toggleRail = (): void => {
   if (mode.value === 'drawer') drawerOpen.value = !drawerOpen.value;
@@ -344,7 +375,15 @@ defineExpose({ syncHeaderOffset });
   <div class="app-shell" :class="[`mode-${mode}`, { 'rail-collapsed': railCollapsed }]">
     <!-- ── left rail ─────────────────────────────────────────────────── -->
     <div v-if="mode === 'drawer'" v-show="drawerOpen" class="app-scrim" @click="drawerOpen = false"></div>
-    <div class="app-rail" :class="{ open: drawerOpen }" role="navigation" aria-label="Sections">
+    <div
+      :id="RAIL_ID"
+      class="app-rail"
+      :class="{ open: drawerOpen }"
+      role="navigation"
+      aria-label="Sections"
+      :aria-hidden="mode === 'drawer' && !drawerOpen ? 'true' : undefined"
+      :inert="mode === 'drawer' && !drawerOpen ? true : undefined"
+    >
       <!--
         Pinned footer, last child of the rail's flex column. `.rail-nav` is the
         only element that grows and scrolls; everything above and below it is
@@ -353,7 +392,7 @@ defineExpose({ syncHeaderOffset });
       -->
       <div class="rail-brand">
         <span class="rail-mark" aria-hidden="true">LAEC</span>
-        <span v-if="mode === 'wide' && !railCollapsed" class="rail-brand-text">
+        <span v-if="labelsVisible" class="rail-brand-text">
           <strong>LAEC</strong>
           <small>{{ roleLabel }}</small>
         </span>
@@ -361,25 +400,30 @@ defineExpose({ syncHeaderOffset });
 
       <div class="rail-nav">
         <div v-for="group in groups" :key="group.title" class="rail-group">
-          <p v-if="mode === 'wide' && !railCollapsed" class="rail-group-title">{{ group.title }}</p>
+          <p v-if="labelsVisible" class="rail-group-title">{{ group.title }}</p>
           <hr v-else class="rail-rule" />
           <button
             v-for="item in group.items"
             :key="item.id"
             class="rail-item"
             :class="{ active: !item.route && item.id === activeId }"
-            :title="mode !== 'wide' || railCollapsed ? item.label : undefined"
+            :title="labelsVisible ? undefined : item.label"
             :aria-current="!item.route && item.id === activeId ? 'page' : undefined"
             @click="select(item)"
           >
             <span class="rail-icon" aria-hidden="true" v-html="ICONS[item.icon] || ICONS.dot"></span>
-            <span v-if="mode === 'wide' && !railCollapsed" class="rail-label">{{ item.label }}</span>
+            <span v-if="labelsVisible" class="rail-label">{{ item.label }}</span>
             <span v-if="item.badge" class="rail-badge">{{ item.badge }}</span>
           </button>
         </div>
       </div>
 
-      <button class="rail-collapse" @click="toggleRail" :aria-label="railCollapsed ? 'Expand navigation' : 'Collapse navigation'">
+      <button
+        v-if="mode !== 'drawer'"
+        class="rail-collapse"
+        @click="toggleRail"
+        :aria-label="railCollapsed ? 'Expand navigation' : 'Collapse navigation'"
+      >
         <span aria-hidden="true" v-html="railCollapsed ? ICONS.chevronRight : ICONS.chevronLeft"></span>
         <span v-if="mode === 'wide' && !railCollapsed">Collapse</span>
       </button>
@@ -387,10 +431,23 @@ defineExpose({ syncHeaderOffset });
 
     <!-- ── top bar ───────────────────────────────────────────────────── -->
     <div class="app-topbar" role="banner">
-      <button v-if="mode === 'drawer'" class="topbar-burger" aria-label="Open navigation" @click="toggleRail">
-        <span aria-hidden="true" v-html="ICONS.menu"></span>
-      </button>
-      <button v-else class="topbar-burger" :aria-label="railCollapsed ? 'Expand navigation' : 'Collapse navigation'" @click="toggleRail">
+      <!--
+        One button, not two, and it states what it will do.
+
+        `aria-expanded` and `aria-controls` are what make a disclosure button
+        work for a screen reader: without them the control announces as a plain
+        button and nothing tells the operator whether the drawer is open, or
+        what the button governs. The label flips with the state for the same
+        reason — "Open navigation" while it is open tells the reader to do the
+        opposite of what the button will do.
+      -->
+      <button
+        class="topbar-burger"
+        :aria-label="mode === 'drawer' ? (drawerOpen ? 'Close navigation' : 'Open navigation') : railCollapsed ? 'Expand navigation' : 'Collapse navigation'"
+        :aria-expanded="mode === 'drawer' ? drawerOpen : !railCollapsed"
+        :aria-controls="RAIL_ID"
+        @click="toggleRail"
+      >
         <span aria-hidden="true" v-html="ICONS.menu"></span>
       </button>
 
@@ -732,7 +789,26 @@ body #app > .surface-app:has(.app-shell) {
   display: flex !important;
   flex-direction: column !important;
   width: 100% !important;
-  min-height: 100vh !important;
+  /*
+   * `height: 100dvh`, not `min-height: 100vh` — and this is the second half of
+   * the sidebar-drift fix.
+   *
+   * The surface wraps the shell. With only a `min-height`, the surface grew to
+   * fit its content, so it stayed taller than the viewport even once the shell
+   * inside it was height-constrained, and the DOCUMENT still had 81px to scroll.
+   * That is the nested-scroll case: a scrollbar on the page and another on the
+   * content region, for one column of content.
+   *
+   * Constraining the surface to the viewport gives the document nothing to
+   * scroll, which leaves `.app-main` as the single scroll container for the
+   * console. `overflow: clip` rather than `hidden` so the surface never becomes a
+   * scroll container itself — a scroll container here would reintroduce exactly
+   * the problem being fixed.
+   */
+  height: 100vh !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  overflow: clip !important;
   background: var(--app-n50) !important;
 }
 
@@ -759,7 +835,33 @@ body #app > .surface-app > .app-shell {
     'rail top'
     'rail main';
   width: 100%;
-  min-height: 100vh;
+  /*
+   * THE SIDEBAR DRIFT FIX — `height`, where it said `min-height`.
+   *
+   * With `min-height: 100vh` the shell grew to fit its content and the document
+   * scrolled. That is fine for the topbar, which is `position: sticky`. It is
+   * NOT fine for the rail: a sticky element only pins for as far as its own
+   * containing block allows, and the rail is a full viewport tall inside a
+   * containing block that was only 87px taller than the viewport. Past that it
+   * rode away with the page — measured at 81px of drift on a 900px screen, i.e.
+   * the sidebar visibly moved on every scroll. `position: fixed` would have
+   * pinned it too, but it takes the rail out of the grid and forces the main
+   * region to be offset by hand, which is a second source of truth for a width.
+   *
+   * Constraining the shell to the viewport means the page never scrolls at all:
+   * the rail and topbar are then fixed by construction rather than by a sticky
+   * containment that has a budget, and `.app-main` becomes the single scroll
+   * container for the console. `min-height: 0` is required alongside `height`
+   * in a flex/grid context; without it the automatic minimum is min-content and
+   * the constraint is ignored.
+   *
+   * `overflow: hidden` clips the box rather than creating a scroller — the same
+   * reason the surface uses `clip`.
+   */
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background: var(--app-n50);
 }
 
@@ -808,7 +910,26 @@ body #app > .surface-app > .app-shell {
 
 .app-main {
   grid-area: main;
+  /*
+   * The console's only scroll container.
+   *
+   * `min-width: 0` for the reason the grid track above is `minmax(0, 1fr)` — it
+   * is what lets a wide table scroll inside this column instead of stretching
+   * the page. `min-height: 0` is the same idea on the other axis, and it is
+   * load-bearing now that the shell is height-constrained: without it this grid
+   * item's automatic minimum is its content's height, `overflow-y: auto` would
+   * have nothing to shrink against, and the panel would spill out of the shell
+   * instead of scrolling.
+   *
+   * `overscroll-behavior: contain` stops a flick at the end of the content from
+   * chaining to the document behind it, which is the same nested-scroll problem
+   * one gesture further down.
+   */
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 22px 24px 48px;
 }
 

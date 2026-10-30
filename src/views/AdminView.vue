@@ -52,6 +52,7 @@ import { canOpenPanel, filterNav, navFor, takePendingPanel } from '../lib/nav';
 import AdminPanelRouter from '../components/admin/AdminPanelRouter.vue';
 import { ADMIN_MODULE_IDS } from '../types/admin-registry';
 import { useSessionStore } from '../stores/session';
+import { bypassesPermissions, hasPermission } from '../lib/permissions';
 import {
   createMockGetFetch,
   installLibraryFetchBridge,
@@ -66,6 +67,7 @@ import type {
   LaecUtils,
   Question,
   ResultRecord,
+  SchoolRecord,
   Student,
 } from '../types';
 import '../styles/admin-page.css';
@@ -88,20 +90,12 @@ const LAEC = window.LAEC_UTILS as LaecUtils;
  */
 (window as unknown as { XLSX: typeof XLSX }).XLSX = XLSX;
 
-const SCHOOL_ORDER = [
-  'SFC',
-  'SGC',
-  'HCC',
-  'MCSS',
-  'STAC',
-  'OLASS',
-  'MEC',
-  'SKC',
-  'MGC',
-  'SHC',
-] as const;
-
-/** Hardcoded school-name map, as served (see D23 for the `/ca/` equivalent). */
+/**
+ * The ten schools the origin hardcodes (D23). Kept for the chart code below,
+ * which reads names by code. The school DROPDOWNS no longer use this — they
+ * read the live registry (`schoolRows`, loaded via GET_SCHOOLS) so a school a
+ * super administrator adds at runtime is selectable everywhere immediately.
+ */
 const SCHOOL_NAMES: Record<string, string> = {
   SFC: "St. Finbarr's College",
   SGC: 'St. Gregory College',
@@ -137,11 +131,35 @@ const currentRole = localStorage.getItem(STORAGE_KEYS.AdminRole) || 'SUPER_ADMIN
 const navMeta = navFor(currentRole);
 
 /* The rail is permission-filtered (D-71): SUPER_ADMIN sees every
-   section, every other session only the ones it actually holds. */
+   section, every other session only the ones it actually holds.
+   `navPermissions`, not `permissions`: while the roles page is previewing a
+   school role the rail is filtered by that role's grants alone. The transport
+   keeps reading `permissions`, so the preview narrows what is offered without
+   touching what is permitted — see `setPreviewRole`. */
 const sessionStore = useSessionStore();
-const navGroups = computed(
-  () => filterNav(navMeta, sessionStore.permissions, currentRole).groups,
+const navGroups = computed(() =>
+  filterNav(navMeta, sessionStore.navPermissions, currentRole, {
+    /* A super administrator is exempt from the rail filter, so a preview would
+       be a no-op without this. The transport still enforces the claim, so the
+       exemption being lifted here widens nothing. */
+    ignoreSuperAdmin: sessionStore.previewRole !== '',
+  }).groups,
 );
+/*
+ * While a preview is on, the page's own gate follows the rail, so a panel does
+ * not stay open behind a rail entry the preview removed. `canPerform` is
+ * deliberately NOT swapped: it is the predicate that mirrors the transport, and
+ * a preview must not be able to make the UI and the transport disagree in the
+ * permissive direction.
+ */
+const sessionCan = (permission?: string | null): boolean => {
+  if (sessionStore.previewRole) {
+    if (!permission) return true;
+    if (bypassesPermissions(sessionStore.role)) return true;
+    return hasPermission(sessionStore.navPermissions, permission);
+  }
+  return sessionStore.can(permission);
+};
 /* The scope chip reads GLOBAL for a cross-school role and the school's own code
    for a school console, which is the only visible difference between them. */
 const SHELL_SCOPE =
@@ -190,8 +208,10 @@ const isAdminPanel = (id: string): boolean => ADMIN_PANEL_IDS.has(id);
  * against an arbitrary permission set without signing in as six roles — and it is
  * the same predicate `callApi` enforces, so a control that renders is a control
  * that works.
+ *
+ * It is defined further down, beside `navGroups`, because while the roles page
+ * previews a school role it has to follow the preview. See the note there.
  */
-const sessionCan = (permission?: string | null): boolean => sessionStore.can(permission);
 
 /** `?panel=` on the URL addresses a module directly, as the dashboard tiles do. */
 const route = useRoute();
@@ -321,6 +341,15 @@ const admRole = ref('#');
 const admEmail = ref('');
 const admSchool = ref('#');
 const admPass = ref('');
+
+/* ── archdiocesan school registry (D23 runtime extension) ──────────────── */
+/* The ten origin schools are the seed; a super administrator can add more.
+   `schoolRows` drives both this panel's table and the "College Assignment"
+   dropdown above, so a school added here is immediately assignable. */
+const schoolRows = ref<SchoolRecord[]>([]);
+const newSchoolCode = ref('');
+const newSchoolName = ref('');
+const newSchoolAddress = ref('');
 
 /* Invigilation monitor (RF-101) */
 const invigSchool = ref('ALL');
@@ -1290,6 +1319,59 @@ const loadAdministratorDirectory = async (): Promise<void> => {
   }
 };
 
+/* ── archdiocesan school registry (D23 runtime extension) ──────────────── */
+
+/**
+ * Load the school registry. The seeded ten are always first; anything added
+ * this session follows. This list also feeds the "College Assignment"
+ * dropdown, so a school added here is immediately assignable to an admin.
+ */
+const loadSchools = async (): Promise<void> => {
+  try {
+    const data = await callApi('GET_SCHOOLS', { schoolID: 'ALL' });
+    schoolRows.value = data.status === 'success' ? data.schools : [];
+  } catch {
+    winAlert('Cloud Error', 'School registry sync failed.');
+  }
+};
+
+/**
+ * Register a new school. The response carries the created record, which is
+ * appended locally so the table and the dropdown update without a second read.
+ */
+const addSchool = async (): Promise<void> => {
+  const code = newSchoolCode.value.trim();
+  const name = newSchoolName.value.trim();
+  const address = newSchoolAddress.value.trim();
+
+  if (!code || !name) {
+    winAlert('Missing Data', 'Enter both a school code and a school name.');
+    return;
+  }
+
+  loadingVisible.value = true;
+  try {
+    const data = await callApi('ADD_SCHOOL', {
+      code,
+      name,
+      address,
+      creatorUsername: localStorage.getItem(STORAGE_KEYS.AdminUsername) || '',
+      creatorRole: (localStorage.getItem(STORAGE_KEYS.AdminRole) || 'SUPER_ADMIN') as AdminRole,
+    });
+    if (data.status !== 'success') {
+      throw new Error(data.message || 'School could not be registered.');
+    }
+    if (data.school) schoolRows.value = [...schoolRows.value, data.school];
+    newSchoolCode.value = '';
+    newSchoolName.value = '';
+    newSchoolAddress.value = '';
+    winAlert('School Added', data.message || `${name} (${code}) added to the registry.`);
+  } catch (e) {
+    winAlert('Registration Failed', msgOf(e) || 'School could not be registered.');
+  }
+  loadingVisible.value = false;
+};
+
 /* ── results (origin lines 1742–1835, 1882–1959, 2595–2604, 2783–2836) ── */
 
 const getResultClassValue = (result: ResultRecord): string =>
@@ -2219,6 +2301,7 @@ onMounted(async () => {
   void getStudentsFromLambda();
   void loadGlobalStats();
   void loadAdministratorDirectory();
+  void loadSchools();
   checkHealth();
   setInterval(checkHealth, 10000);
 
@@ -2454,7 +2537,7 @@ onMounted(async () => {
             <label>Filter By College</label>
             <select id="dir-school-filter" v-model="dirSchoolFilter" @change="getStudentsFromLambda()">
               <option value="ALL">All Schools</option>
-              <option v-for="code in SCHOOL_ORDER" :key="code" :value="code">{{ SCHOOL_NAMES[code] }} ({{ code }})</option>
+              <option v-for="s in schoolRows" :key="s.Code" :value="s.Code">{{ s.Name }} ({{ s.Code }})</option>
             </select>
           </div>
           <div>
@@ -2549,7 +2632,7 @@ onMounted(async () => {
             <label>Select School</label>
             <select id="res-school" v-model="resSchoolFilter">
               <option value="ALL">...Select School...</option>
-              <option v-for="code in SCHOOL_ORDER" :key="code" :value="code">{{ SCHOOL_NAMES[code] }}</option>
+              <option v-for="s in schoolRows" :key="s.Code" :value="s.Code">{{ s.Name }}</option>
             </select>
           </div>
           <div>
@@ -2815,6 +2898,56 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- ── SCHOOLS ──────────────────────────────────────────────────── -->
+    <!-- The archdiocesan school registry (D23 runtime extension). The origin
+         hardcodes ten schools with no way to add one; this panel is that way,
+         and it is super-administrator-only via `schools.manage`. -->
+    <div id="schools" class="tab-panel" :class="{ active: activeTab === 'schools' }">
+      <div class="card">
+        <h3>Archdiocesan Schools</h3>
+        <p style="font-size: 0.75rem; color: #666; margin-bottom: 1.5rem">
+          Register a new archdiocesan school. A new school becomes selectable across every console — in the
+          College Assignment dropdown, the directory filters and the joint-exam reports — as soon as it is
+          added.
+        </p>
+        <div class="grid-2">
+          <div>
+            <label>School Code</label>
+            <input type="text" id="school-code" v-model="newSchoolCode" placeholder="e.g. ABC" maxlength="10" />
+            <p style="font-size: 0.68rem; color: #777; margin: 6px 0 0">
+              2–10 letters or numbers, no spaces or punctuation. This is the SchoolID used in registration
+              numbers and export filenames.
+            </p>
+          </div>
+          <div>
+            <label>School Name</label>
+            <input type="text" id="school-name" v-model="newSchoolName" placeholder="e.g. Archdiocese College" />
+          </div>
+          <div>
+            <label>Address (optional)</label>
+            <input type="text" id="school-address" v-model="newSchoolAddress" placeholder="e.g. Akoka, Yaba, Lagos" />
+          </div>
+        </div>
+        <button class="btn-primary" style="margin-top: 20px" @click="addSchool()">ADD SCHOOL</button>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Code</th><th>School Name</th><th>Address</th><th>Type</th></tr></thead>
+          <tbody id="school-table-body">
+            <tr v-for="s in schoolRows" :key="s.Code">
+              <td style="font-weight: bold; color: var(--laec-blue)">{{ s.Code }}</td>
+              <td>{{ s.Name }}</td>
+              <td>{{ s.Address || '—' }}</td>
+              <td><span style="font-size: 0.7rem; font-weight: bold">{{ s.builtin ? 'BUILT-IN' : 'ADDED' }}</span></td>
+            </tr>
+            <tr v-if="!schoolRows.length">
+              <td colspan="4" style="text-align: center; color: #999">No schools loaded.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- ── ADMINS ───────────────────────────────────────────────────── -->
     <div id="admins" class="tab-panel" :class="{ active: activeTab === 'admins' }">
       <div class="card">
@@ -2854,7 +2987,7 @@ onMounted(async () => {
             <select id="adm-school-list" v-model="admSchool">
               <option value="#">....Select School....</option>
               <option value="GLOBAL">Archdiocese (Master Level)</option>
-              <option v-for="code in SCHOOL_ORDER" :key="code" :value="code">{{ SCHOOL_NAMES[code] }} ({{ code }})</option>
+              <option v-for="s in schoolRows" :key="s.Code" :value="s.Code">{{ s.Name }} ({{ s.Code }})</option>
             </select>
           </div>
           <div>
@@ -2915,7 +3048,7 @@ onMounted(async () => {
             <label>Filter By School</label>
             <select id="invigilator-school-filter" v-model="invigSchool">
               <option value="ALL">All Schools</option>
-              <option v-for="code in SCHOOL_ORDER" :key="code" :value="code">{{ SCHOOL_NAMES[code] }}</option>
+              <option v-for="s in schoolRows" :key="s.Code" :value="s.Code">{{ s.Name }}</option>
             </select>
           </div>
           <div>

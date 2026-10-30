@@ -678,8 +678,6 @@ watch(() => props.module.id, loadActive);
       </div>
     </template>
 
-    <template #actions />
-
     <fieldset class="ap-fieldset">
       <legend class="ap-fieldset__legend">Student</legend>
       <label class="ap-field">
@@ -807,17 +805,9 @@ watch(() => props.module.id, loadActive);
   font-size: 0.8125rem;
 }
 
-.ap-seat-row {
-  display: grid;
-  grid-template-columns: 1.4fr 1.4fr 0.8fr auto;
-  gap: 0.5rem;
-  align-items: end;
-  margin-bottom: 0.5rem;
-}
-
-.ap-seat-row .ap-field {
-  margin-bottom: 0;
-}
+/* `.ap-seat-row` and `.ap-total` are declared in the shared `admin-panel.css`,
+ * not here: the sale sheet needs the same row shape and a scoped rule would not
+ * reach it. */
 
 .ap-callout {
   border: 1px solid var(--laec-line, #d7dee8);
@@ -835,11 +825,5 @@ watch(() => props.module.id, loadActive);
   margin: 0 0 0.25rem;
   font-size: 0.9375rem;
   font-weight: 700;
-}
-
-@media (max-width: 640px) {
-  .ap-seat-row {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

@@ -36,9 +36,9 @@
 }
 
 .ap-tab--on {
-  background: #eaf2fb;
-  border-color: #bcd6f0;
-  color: #16457c;
+  background: var(--ap-accent-soft, #eaf2fb);
+  border-color: var(--ap-line-accent, #bcd6f0);
+  color: var(--ap-accent, #16457c);
 }
 
 .ap-toolbar {
@@ -73,7 +73,7 @@
   padding: 0.4375rem 0.5rem;
   border: 1px solid var(--laec-line, #d7dee8);
   border-radius: 8px;
-  background: #fff;
+  background: var(--ap-surface, #fff);
   color: inherit;
 }
 
@@ -81,7 +81,7 @@
   border: 1px solid var(--laec-line, #d7dee8);
   border-radius: 12px;
   overflow-x: auto;
-  background: #fff;
+  background: var(--ap-surface, #fff);
 }
 
 .ap-table {
@@ -112,7 +112,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted, #5b6472);
-  background: #f7f9fc;
+  background: var(--ap-surface-soft, #f7f9fc);
   white-space: nowrap;
 }
 
@@ -130,7 +130,7 @@
 }
 
 .ap-row:hover {
-  background: #f7f9fc;
+  background: var(--ap-surface-soft, #f7f9fc);
 }
 
 .ap-row:focus-visible {
@@ -166,8 +166,8 @@
   width: 2rem;
   height: 2rem;
   border-radius: 999px;
-  background: #eaf2fb;
-  color: #16457c;
+  background: var(--ap-accent-soft, #eaf2fb);
+  color: var(--ap-accent, #16457c);
   font-size: 0.6875rem;
   font-weight: 700;
   flex-shrink: 0;
@@ -192,15 +192,15 @@
   padding: 0.125rem 0.5rem;
   font-size: 0.6875rem;
   font-weight: 700;
-  background: #eef2f7;
-  color: #45505f;
+  background: var(--ap-surface-sunken, #eef2f7);
+  color: var(--ap-text-faint, #45505f);
   white-space: nowrap;
 }
 
-.ap-badge--ok { background: #e6f6ed; color: #14532d; }
-.ap-badge--warn { background: #fdf3dd; color: #8a6104; }
-.ap-badge--bad { background: #fbe9e9; color: #8f2a2a; }
-.ap-badge--info { background: #eaf2fb; color: #16457c; }
+.ap-badge--ok { background: var(--ap-success-tint, #e6f6ed); color: var(--ap-success, #14532d); }
+.ap-badge--warn { background: var(--ap-warning-soft, #fdf3dd); color: var(--ap-warning, #8a6104); }
+.ap-badge--bad { background: var(--ap-danger-tint, #fbe9e9); color: var(--ap-danger, #8f2a2a); }
+.ap-badge--info { background: var(--ap-accent-soft, #eaf2fb); color: var(--ap-accent, #16457c); }
 
 .ap-pager {
   display: flex;
@@ -235,11 +235,11 @@
 .ap-field__label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #3b4553;
+  color: var(--ap-text-strong, #3b4553);
 }
 
 .ap-field__req {
-  color: #8f2a2a;
+  color: var(--ap-danger, #8f2a2a);
   margin-left: 0.125rem;
 }
 
@@ -264,7 +264,7 @@
   padding: 0.5rem 0.625rem;
   border: 1px solid var(--laec-line, #d7dee8);
   border-radius: 8px;
-  background: #fff;
+  background: var(--ap-surface, #fff);
   color: inherit;
   width: 100%;
 }
@@ -275,13 +275,30 @@
 }
 
 .ap-input[readonly] {
-  background: #f7f9fc;
+  background: var(--ap-surface-soft, #f7f9fc);
   color: var(--text-muted, #5b6472);
 }
 
 .ap-input--area {
   resize: vertical;
   min-height: 4rem;
+}
+
+/* A smaller second figure inside a numeric cell, for when a locally derived
+   count sits beside the one the origin published and the two disagree. Rendered
+   as text rather than a second column so the observed figure keeps its place. */
+.ap-cell__note {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 400;
+  color: var(--text-muted, #5b6472);
+  white-space: nowrap;
+}
+
+/* A row whose role this session holds. Tinted rather than bolded, because the
+   state is context for the row's action, not the row's primary information. */
+.ap-row--held {
+  background: var(--ap-surface-hint, #f2f7fd);
 }
 
 /* ── quantity stepper and radio choices ─────────────────────────────────
@@ -310,7 +327,7 @@
   padding: 0.75rem 0.875rem;
   border: 1px solid var(--laec-line, #d7dee8);
   border-radius: 10px;
-  background: #f7f9fc;
+  background: var(--ap-surface-soft, #f7f9fc);
 }
 
 .ap-fieldset__legend {
@@ -345,7 +362,7 @@
   border: 1px solid var(--laec-line, #d7dee8);
   border-radius: 10px;
   padding: 0.75rem 0.875rem;
-  background: #f7f9fc;
+  background: var(--ap-surface-soft, #f7f9fc);
 }
 
 .ap-fields dt {
@@ -369,8 +386,8 @@
   padding: 0.4375rem 0.8125rem;
   cursor: pointer;
   border: 1px solid var(--laec-line, #d7dee8);
-  background: #fff;
-  color: #3b4553;
+  background: var(--ap-surface, #fff);
+  color: var(--ap-text-strong, #3b4553);
 }
 
 .ap-btn:hover:not(:disabled) {
@@ -386,23 +403,23 @@
 .ap-btn--primary {
   background: var(--laec-blue, #1c4e80);
   border-color: var(--laec-blue, #1c4e80);
-  color: #fff;
+  color: var(--ap-surface, #fff);
 }
 
 .ap-btn--primary:hover:not(:disabled) {
-  background: #16457c;
-  color: #fff;
+  background: var(--ap-accent, #16457c);
+  color: var(--ap-surface, #fff);
 }
 
 .ap-btn--danger {
-  background: #a83232;
-  border-color: #a83232;
-  color: #fff;
+  background: var(--ap-danger-strong, #a83232);
+  border-color: var(--ap-danger-strong, #a83232);
+  color: var(--ap-surface, #fff);
 }
 
 .ap-btn--danger:hover:not(:disabled) {
-  background: #8f2a2a;
-  color: #fff;
+  background: var(--ap-danger, #8f2a2a);
+  color: var(--ap-surface, #fff);
 }
 
 .ap-btn--ghost {
@@ -420,7 +437,7 @@
   border: 1px solid var(--laec-line, #d7dee8);
   border-radius: 12px;
   padding: 1.125rem;
-  background: #fff;
+  background: var(--ap-surface, #fff);
 }
 
 .ap-card__title {
@@ -444,7 +461,7 @@
   border: 1px solid var(--laec-line, #d7dee8);
   border-left: 4px solid var(--laec-accent, #c8a24a);
   border-radius: 10px;
-  background: #fff;
+  background: var(--ap-surface, #fff);
   padding: 0.75rem 0.875rem;
 }
 
@@ -459,7 +476,7 @@
 .ap-stat__value {
   font-size: 1.375rem;
   font-weight: 700;
-  color: #1f2933;
+  color: var(--ap-text, #1f2933);
   margin-top: 0.125rem;
 }
 
@@ -472,9 +489,9 @@
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  border: 1px solid #a7d8bf;
-  background: #eefaf3;
-  color: #14532d;
+  border: 1px solid var(--ap-success-line, #a7d8bf);
+  background: var(--ap-success-soft, #eefaf3);
+  color: var(--ap-success, #14532d);
   border-radius: 10px;
   padding: 0.75rem 0.875rem;
 }
@@ -525,9 +542,9 @@
 }
 
 .ap-error {
-  border: 1px solid #f0c8c8;
-  background: #fdf3f3;
-  color: #8f2a2a;
+  border: 1px solid var(--ap-danger-line, #f0c8c8);
+  background: var(--ap-danger-soft, #fdf3f3);
+  color: var(--ap-danger, #8f2a2a);
   border-radius: 10px;
   padding: 0.875rem 1rem;
   display: flex;
@@ -555,8 +572,8 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #16457c;
-  background: #eaf2fb;
+  color: var(--ap-accent, #16457c);
+  background: var(--ap-accent-soft, #eaf2fb);
   border-radius: 6px;
   padding: 0.3125rem 0.5rem;
   display: inline-block;
@@ -571,7 +588,7 @@
 .ap-form__error {
   margin: 0.25rem 0 0;
   font-size: 0.8125rem;
-  color: #8f2a2a;
+  color: var(--ap-danger, #8f2a2a);
 }
 
 .ap-detail__actions {
@@ -595,11 +612,24 @@
   justify-content: center;
   padding: 1.5rem 1rem;
   background: rgba(11, 34, 66, 0.55);
+  /* Blurs whatever is behind the dialog, which is what separates a modal from a
+     card that happens to sit on top of the page. Kept small (2px) so the page is
+     still recognisable rather than turned into wallpaper. The scrim colour above
+     is unchanged: the dialog's separation from the page comes from the scrim,
+     so the blur is additive rather than load-bearing. */
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   overflow-y: auto;
+  animation: ap-dialog-fade 0.18s ease-out;
+}
+
+@keyframes ap-dialog-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .ap-dialog__panel {
-  background: #fff;
+  background: var(--ap-surface, #fff);
   border-radius: 14px;
   width: 100%;
   max-width: 640px;
@@ -607,20 +637,116 @@
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 3rem);
+  /* `dvh` tracks the viewport as mobile browser chrome collapses; the `vh` above
+     stays as the value for engines that do not know the unit. */
+  max-height: calc(100dvh - 3rem);
+  animation: ap-dialog-rise 0.18s ease-out;
 }
 
-.ap-dialog__head {
+@keyframes ap-dialog-rise {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The close control is a fixed 32x32 square holding a 1.7-stroke icon, not a
+   text `&times;` inside a button whose size comes from font metrics. Square by
+   construction, and the glyph is optically centred by the box rather than by the
+   line box. */
+.ap-dialog__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ap-text-muted, #5b6472);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ap-dialog__close:hover:not(:disabled) {
+  background: var(--ap-surface-tint, #f2f6fb);
+  color: var(--ap-text, #1f2933);
+}
+
+.ap-dialog__close:focus-visible {
+  outline: 2px solid var(--laec-blue, #1c4e80);
+  outline-offset: 1px;
+}
+
+.ap-dialog__close-icon {
+  display: inline-flex;
+  line-height: 0;
+}
+
+/*
+ * 32px is right for a pointer and wrong for a thumb. Below 640px, or on any
+ * coarse-pointer device, the button keeps its 8px radius and its glyph but grows
+ * to a 44px target, so the hit area extends past the visible square rather than
+ * the glyph being made bigger.
+ */
+@media (pointer: coarse), (max-width: 640px) {
+  .ap-dialog__close {
+    width: 44px;
+    height: 44px;
+    margin: -6px -6px -6px 0;
+  }
+}
+
+/*
+ * The dialog's header, restated with enough specificity to actually win.
+ *
+ * `.page-admin header` (admin-page.css:73) styles the console's sticky page
+ * header and, being element-scoped, reaches EVERY <header> inside the admin
+ * page — including a modal's. It sets `position: fixed`, a white-on-navy
+ * gradient, `backdrop-filter: blur(18px)`, `flex-direction: column`,
+ * `justify-content: space-between`, a gap, and its own padding.
+ *
+ * `.page-admin .ap-admin-panel header` (admin-panel-page.css) undoes the
+ * position, colour, background, border, radius, shadow and blur — but not the
+ * flex axis, the gap or the padding, and its blanket `border: 0` erases the
+ * hairline this rule exists to draw. A dialog opened from inside a panel IS
+ * inside `.ap-admin-panel`, so it inherits all of it.
+ *
+ * Two classes ahead of the child combinator put this at (0,3,0), which outranks
+ * both (0,1,1) and (0,2,1) without resorting to source order or `!important`.
+ */
+.ap-dialog .ap-dialog__panel > .ap-dialog__head {
+  position: static;
   display: flex;
+  flex-direction: row;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
   padding: 1rem 1.25rem;
+  border: 0;
   border-bottom: 1px solid var(--laec-line, #d7dee8);
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .ap-dialog__title {
   margin: 0;
   font-size: 1rem;
+}
+
+/*
+ * The toolbar row (search, count, actions) sits between the header and the body
+ * as a flex child of the panel, so like the header and footer it cannot scroll
+ * away. It is tinted rather than bordered so three stacked horizontal rules —
+ * header, toolbar, footer — do not read as three lines around one panel.
+ */
+.ap-dialog__toolbar {
+  padding: 0.75rem 1.25rem;
+  background: var(--ap-surface-soft, #f7f9fc);
+  border-bottom: 1px solid var(--laec-line, #d7dee8);
+  flex: 0 0 auto;
 }
 
 .ap-dialog__body {
@@ -642,7 +768,7 @@
   right: 0;
   top: calc(100% + 0.25rem);
   min-width: 170px;
-  background: #fff;
+  background: var(--ap-surface, #fff);
   border: 1px solid var(--laec-line, #d7dee8);
   border-radius: 10px;
   box-shadow: 0 12px 30px rgba(11, 34, 66, 0.18);
@@ -666,11 +792,11 @@
 }
 
 .ap-menu__item:hover:not(:disabled) {
-  background: #f2f6fb;
+  background: var(--ap-surface-tint, #f2f6fb);
 }
 
 .ap-menu__item--danger {
-  color: #8f2a2a;
+  color: var(--ap-danger, #8f2a2a);
 }
 
 .ap-menu__item:disabled {
@@ -706,8 +832,96 @@
 
 .ap-check input[type='text'] { flex: 1; }
 
+/* ── repeatable field rows ────────────────────────────────────────────────
+ * A row of related controls that the operator can add to and remove from: a
+ * committee seat, a sale line. Shared because two modules need the same shape,
+ * and `scoped` styles could not have carried it across both — a row defined in
+ * one panel's scoped block simply does not exist in the other's.
+ *
+ * Four columns by default (name / email / seat / remove). `data-cols="3"` is
+ * the narrower variant the sale sheet uses, where the quantity is a number and
+ * needs far less room than an email address.
+ */
+.ap-seat-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1.4fr 0.8fr auto;
+  gap: 0.5rem;
+  align-items: end;
+  margin-bottom: 0.5rem;
+}
+
+.ap-seat-row[data-cols='3'] {
+  grid-template-columns: 1fr 6rem auto;
+}
+
+.ap-seat-row .ap-field {
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .ap-seat-row,
+  .ap-seat-row[data-cols='3'] {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A figure the operator cannot type into: a running total. Given the same
+ * weight as a price elsewhere rather than being rendered as body text, so it
+ * reads as an output rather than as a label. */
+.ap-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.75rem 0 0;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--laec-line, #d7dee8);
+  border-radius: 10px;
+  background: var(--ap-surface-soft, #f7f9fc);
+  font-size: 0.8125rem;
+}
+
+.ap-total strong {
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 640px) {
   .ap-form { grid-template-columns: 1fr; }
-  .ap-dialog { padding: 0.75rem 0.5rem; }
-  .ap-dialog__panel { max-height: calc(100vh - 1.5rem); }
+
+  /* Below 640px the dialog stops being a centred box and becomes a bottom sheet.
+     A full-width sheet is the one layout where every control clears a 44px tap
+     target without the operator having to zoom, and it puts the actions under
+     the thumb rather than at the top of the screen. */
+  .ap-dialog {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .ap-dialog__panel {
+    max-height: calc(100vh - 3.5rem);
+    max-height: calc(100dvh - 3.5rem);
+    border-radius: 16px 16px 0 0;
+  }
+
+  /* The rise reads as the sheet being pulled up, so on mobile it becomes a pure
+     slide with no scale — scaling a full-width sheet looks like a zoom. */
+  .ap-dialog__panel { animation-name: ap-dialog-sheet; }
+
+  .ap-dialog__head,
+  .ap-dialog__body,
+  .ap-dialog__foot,
+  .ap-dialog__toolbar { padding-left: 1rem; padding-right: 1rem; }
+}
+
+@keyframes ap-dialog-sheet {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The dialog's motion is decoration on an already-instant open. A user who has
+   asked the OS for reduced motion gets the dialog at its resting state, with the
+   focus move and the scrim still there — nothing is lost but the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .ap-dialog,
+  .ap-dialog__panel { animation: none; }
 }
