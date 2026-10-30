@@ -1,3 +1,12 @@
 node_modules
 BUILD-LOG.md
 COLOUR-SPEC.md
+
+# Build output — Vercel compiles this fresh on deploy (see vercel.json),
+# so it must never be tracked; hashed filenames change on every build.
+dist/
+
+# Local tooling / generated state, not part of the app source.
+.refact/
+.layer-check
+.vercel/

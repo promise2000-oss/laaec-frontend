@@ -1,0 +1,17 @@
+# Reference copies of the live site — read-only, never built or served.
+# (vite.config.ts already keeps these out of the watcher; exclude them from the
+# upload too so they don't bloat the deployment.)
+origin-pages/
+origin-assets/
+
+# Build output — Vercel runs the build fresh into dist/ itself.
+dist/
+
+# Non-application material that isn't needed to compile the site.
+docs/
+tools/
+*.md
+
+# Local tooling and previous deploys.
+node_modules/
+.vercel/
