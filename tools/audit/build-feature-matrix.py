@@ -77,17 +77,19 @@ NOTES = {
         "Same reasoning: \"Couldn't load notification settings\".",
     ),
     "store": (
-        "Partial",
-        "The catalogue and its search render. Ordering is a separate flow and is "
-        "not issued \u2014 see workflows.md, W20.",
+        "Implemented",
+        "Catalogue, search, category filter and the cart badge. Checkout is a "
+        "real transaction — see workflows.md, W20.",
     ),
     "cart": (
-        "Partial",
-        "Cart contents render; checkout is not issued. See workflows.md, W20.",
+        "Implemented",
+        "Cart lines with quantity and removal, the online/bursary choice, and "
+        "PLACE_STORE_ORDER creating an order the bursary queue then gains. "
+        "See workflows.md, W20.",
     ),
     "orders": (
-        "Partial",
-        "The order list renders from the mock's seed; no payment is verified.",
+        "Implemented",
+        "Order history from the mock, including orders placed through checkout.",
     ),
     "student-attendance-report": (
         "Divergence",
@@ -352,10 +354,15 @@ def main() -> int:
         "the live deployment, so there is nothing to reproduce."
     )
     add(
-        "3. **Disciplinary and Counselling** — `/disciplinary/*`, `/counselling/*`. "
-        "Two whole modules, each with case files, committees and reports. Not "
-        "started; this is the largest remaining scope and it is stated rather than "
-        "hidden behind a stub."
+        "3. **Disciplinary and Counselling** — now implemented, on eight panels "
+        "and two shared components. What is *not* reproduced is stated rather than "
+        "hidden: the live incident catalogue holds 33 offences and this seeds the 9 "
+        "that were captured verbatim before the crawl truncated (the rest are "
+        "server-side data, absent from the deployed frontend source too, and an "
+        "invented rule in a rule book is worse than a missing one — "
+        "`parity-report.md` §12); the student picker is a fixed list because the "
+        "mock has no directory to search; and severity is filtered client-side "
+        "because the teacher-side read takes no severity argument."
     )
     add(
         "4. **The parent-facing surface** — `/parent/*`. Three of the seven are 404s "

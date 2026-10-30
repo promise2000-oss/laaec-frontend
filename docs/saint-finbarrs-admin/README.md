@@ -53,8 +53,8 @@ permission gate, that gate is documented as SOURCE, not as observed behaviour.
 | `modules.md` | The 14 discovered modules and what each one owns |
 | `route-inventory.md` | All 131 audited routes, their live status, and the panel that implements each |
 | `feature-inventory.md` | Per-feature record: purpose, UI, actions, validation, data, permissions |
-| `workflows.md` | 20 end-to-end workflows, each traced on the live UI and driven here |
-| `roles-and-permissions.md` | The authorization model, the 33 roles, the 180-code vocabulary |
+| `workflows.md` | 31 workflow checks: end-to-end workflows traced on the live UI, and what writing each check turned up |
+| `roles-and-permissions.md` | Both authorization axes, the 33 school roles, the 180-code vocabulary, and where the reconstruction diverges from the live counts |
 | `ui-audit.md` | Layout, chrome, tables, forms, states, responsive behaviour, observed defects |
 | `api-observations.md` | The 42 observed API calls, and the endpoint map from source |
 | `feature-matrix.md` | Master matrix: every panel, its renderer, its permissions, its status |
@@ -90,7 +90,17 @@ every place this build deliberately differs from the live one.
 
 ## What was verified, in one line
 
-Type check, build, six static cross-checks, a 66-panel walk with zero console or
-page errors, and 22 workflow checks driven end to end against the mock — all
-passing. Five real defects were found by those workflow checks and fixed; they
-are listed in `verification-checklist.md`.
+Type check, build, eight static cross-checks, a 74-panel walk with zero console or
+page errors, and 31 workflow checks driven end to end against the mock — all
+passing.
+
+Twelve real defects have been found by those checks and fixed, including one that
+matters more than its size: the store's Checkout button reported *"Order placed.
+It is now in the bursary confirmation queue."* while placing no order. It had been
+documented as "absent", which understated it — a missing control is noticed, a
+control that reports an outcome it did not produce is not. All twelve are listed
+in `verification-checklist.md`.
+
+Two defects were invisible to `vue-tsc` and to `vite build` — a duplicated template
+slot that 500'd every panel, and a static check that had stopped resolving its own
+imports. Both are now caught by checks that run on every change.

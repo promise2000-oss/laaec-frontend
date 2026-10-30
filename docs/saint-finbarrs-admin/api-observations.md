@@ -105,10 +105,45 @@ per group:
 
 ## How this project's contract is shaped
 
-`src/api/contract.ts` declares 163 actions in one map, each with a request and a
+`src/api/contract.ts` declares 170 actions in one map, each with a request and a
 response shape. `src/api/mock.ts` enforces a permission on every POST before a
-handler runs. The admin modules added **42 actions** on top of the existing LAEC
-set — **17 reads and 25 writes**:
+handler runs. The admin modules added **49 actions** on top of the existing LAEC
+set — **18 reads and 31 writes**:
+
+### What the store checkout required
+
+`PLACE_STORE_ORDER` exists because the live store's checkout is a **transaction**,
+and a transaction needs something to transact against. The panel's cart used to be
+component state — an array appended to on every "Add to Cart" — so "checkout"
+looped `ADD_TO_CART` over its own lines. That adds to the thing it has just
+emptied and cannot create an order even in principle, while reporting success.
+
+The cart is now a record the mock owns (`StoreCart`), so:
+
+| Action | Mirrors |
+|---|---|
+| `GET_CART` | `GET /store/cart` — its own endpoint, not the item grid filtered by a flag |
+| `ADD_TO_CART` | `POST /store/cart` |
+| `UPDATE_CART_ITEM` | `PATCH /store/cart/:id` — set-to, not add-to, or lowering a line would need a second action |
+| `REMOVE_CART_ITEM` | `DELETE /store/cart/:id` — "remove" is not "set to zero" |
+| `PLACE_STORE_ORDER` | `POST /store/checkout` |
+| `CONFIRM_STORE_ORDER` | `PATCH /store/queue/:id/confirm` |
+| `RESOLVE_STORE_REFUND` | `PATCH /store/queue/:id/resolve-refund` |
+
+Two behaviours worth naming because they are decisions, not transcriptions:
+
+- **Stock moves at checkout, and returns when a refund is *resolved*.** Not at
+  confirmation, and not at refund-request. An order the bursary never gets to
+  would otherwise hold stock nothing is waiting for.
+- **`"Payment reference is required."` is enforced in the mock, not the panel.**
+  The live queue detail refuses it before issuing anything. A panel that merely
+  disabled the button would satisfy a weaker check and prove nothing about the
+  mock — so `workflows.md` W20b asserts the refusal comes from the server.
+
+The online-payment path is **not** reproduced: it redirects to a payment page and
+back through a callback, and inventing a provider's redirect and its verification
+would be inventing the thing. `PLACE_STORE_ORDER` takes a `paymentMethod` and the
+bursary path — the one the queue exists to serve — is complete.
 
 ### Reads (17)
 
@@ -120,6 +155,7 @@ set — **17 reads and 25 writes**:
 | Inventory / store / fees | `GET_ADMIN_INVENTORY_REPORTS`, `LIST_ORDERS`, `GET_ADMIN_FEE_BREAKDOWN`, `GET_ADMIN_FEE_REPORTS`, `GET_ADMIN_WALLET_REPORTS` |
 | Results | `LIST_UPLOAD_WINDOWS`, `GET_RESULTS_ENTRY`, `LIST_RESULTS_QUEUE`, `GET_GRADING_SETTINGS`, `GET_STUDENT_RESULTS`, `GET_REPORT_CARD` |
 | System | `GET_ADMIN_GENERAL_SETTINGS`, `GET_ADMIN_SYSTEM_CONFIGURATION` |
+| Store | `GET_CART` |
 
 ### Writes (25)
 
@@ -128,7 +164,9 @@ set — **17 reads and 25 writes**:
 | Generic engine | `SAVE_ADMIN_RECORD`, `DELETE_ADMIN_RECORD`, `ADMIN_DECIDE`, `ADMIN_SET_STATUS`, `DELETE_ADMIN_ACCESS`, `SAVE_ADMIN_ROLE`, `ASSIGN_ROLE`, `UNASSIGN_ROLE`, `SAVE_ADMIN_PERMISSION_GRANT`, `RESEND_INVITATION`, `IMPORT_STAFF`, `IMPORT_STUDENTS`, `CONFIRM_IMPORT` |
 | Attendance | `CREATE_ATTENDANCE_SHEET`, `SAVE_ATTENDANCE_SHEET`, `SAVE_ATTENDANCE_MARKS` |
 | HR | `LIST_HR_QUERIES`, `ISSUE_HR_QUERY`, `RESOLVE_HR_QUERY`, `LIST_AWARDS`, `SAVE_AWARD` |
-| Inventory / store / fees | `SAVE_STOCK_MOVEMENT`, `ADD_TO_CART`, `SET_ORDER_STATUS`, `RECORD_FEE_PAYMENT` |
+| Inventory / store / fees | `SAVE_STOCK_MOVEMENT`, `RECORD_FEE_PAYMENT` |
+| Store checkout | `ADD_TO_CART`, `UPDATE_CART_ITEM`, `REMOVE_CART_ITEM`, `PLACE_STORE_ORDER`, `CONFIRM_STORE_ORDER`, `RESOLVE_STORE_REFUND` |
+| Case modules | `DELETE_DISCIPLINARY_CASE`, `DELETE_COUNSELLING_CASE` — the only two the Disciplinary and Counselling admin panels add. Everything else they need already existed for the `/teacher/` console. |
 | Money | `ADJUST_WALLET` |
 | Results | `SAVE_UPLOAD_WINDOW`, `SAVE_RESULT_ENTRIES`, `DECIDE_RESULT`, `SAVE_GRADING_SETTINGS` |
 | System | `SAVE_GENERAL_SETTINGS`, `SAVE_SYSTEM_CONFIGURATION`, `SAVE_ADMIN_BRANDING` |

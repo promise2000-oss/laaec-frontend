@@ -645,9 +645,12 @@ async (page) => {
         await page.locator('[data-admin-panel] button:has-text("Edit")').first().click({ timeout: 10000 });
         await page.waitForTimeout(700);
 
+        /* Reads the live pill in the dialog toolbar ("N selected") rather than the
+           old "N permission(s) selected." prose line. The assertion is the same:
+           the number must move by exactly one when one box is toggled. */
         const selected = async () => {
-          const note = await txt('[role="dialog"] .ap-inline-note');
-          const m = /(\d+)\s+permission\(s\)\s+selected/i.exec(note);
+          const pill = await txt('[role="dialog"] .ap-perm__pill');
+          const m = /(\d+)/.exec(pill);
           return m ? Number(m[1]) : -1;
         };
         const before = await selected();
@@ -659,7 +662,7 @@ async (page) => {
             id: 'W11',
             name: 'permissions: adding a grant changes the count and saves',
             verdict: 'FAIL',
-            detail: 'the dialog showed no "N permission(s) selected." line for ' + role,
+            detail: 'the dialog showed no live selection count for ' + role,
           });
           return;
         }
@@ -686,7 +689,11 @@ async (page) => {
           return;
         }
 
-        await clickText('Save', dialog());
+        /* The confirm button by position in the dialog footer, not by its label.
+           The permissions dialog labels it "Save changes"; hard-coding the string
+           breaks this check every time the wording improves, and the wording is
+           the part an operator actually reads. */
+        await dialog().locator('.ap-dialog__foot button').last().click({ timeout: 10000 });
         await page.waitForTimeout(1100);
         const banner = await txt('.ap-banner');
         const closed = (await count('[role="dialog"]')) === 0;

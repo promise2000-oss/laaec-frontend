@@ -543,9 +543,15 @@ async function main() {
         .find((b) => b.textContent.trim() === 'Edit').click();
       await new Promise((r) => setTimeout(r, 500));
       const dlg = document.querySelector('[role="dialog"]');
+      /* The live selection count is now a pill in the dialog toolbar that reads
+         "N selected", not the prose line "N permission(s) selected." that the
+         old markup put above the matrix. What is asserted is unchanged — toggling
+         one permission moves this number by exactly one, and only the source of
+         the number moved. */
       const count = () => {
-        const note = dlg.querySelector('.ap-inline-note').textContent;
-        const m = /(\\d+)\\s+permission\\(s\\)\\s+selected/i.exec(note);
+        const pill = dlg.querySelector('.ap-perm__pill');
+        if (!pill) return -1;
+        const m = /(\\d+)/.exec(pill.textContent);
         return m ? Number(m[1]) : -1;
       };
       const before = count();
@@ -556,7 +562,11 @@ async function main() {
       boxes[target].click();
       await new Promise((r) => setTimeout(r, 400));
       const after = count();
-      Array.from(dlg.querySelectorAll('button')).find((b) => b.textContent.trim() === 'Save').click();
+      /* The confirm button by position in the dialog footer, not by its label. The
+         permissions dialog labels it "Save changes"; a check that hard-codes the
+         string breaks every time the wording improves, and the wording is the
+         part an operator actually reads. */
+      Array.from(dlg.querySelectorAll('.ap-dialog__foot button')).pop().click();
       await new Promise((r) => setTimeout(r, 1400));
       const banner = document.querySelector('.ap-banner');
       return { role, before, after,
@@ -1064,6 +1074,533 @@ async function main() {
       }
     });
 
+    // ── W21 · the incident catalogue is the school's rule book ─────────
+    /* Nine of the live 33 entries, verbatim, sanction text and all. This asserts
+       the panel is reading the real catalogue rather than a lookup table of short
+       labels, which is the failure mode a summary description would produce. */
+    await step('W21', 'disciplinary: the incident catalogue carries the sanction text verbatim', async () => {
+      await open('disciplinary-incidents');
+      const cat = await read(`
+        const rows = Array.from(document.querySelectorAll('[data-admin-panel] table tbody tr'));
+        const first = rows.map((tr) => Array.from(tr.querySelectorAll('td')).map((td) => td.textContent.trim()));
+        return {
+          count: rows.length,
+          first: first[0] || null,
+          hasRoman: rows.some((tr) => /^i\\. /.test(tr.querySelectorAll('td')[1].textContent.trim())),
+        };
+      `);
+      if (
+        cat.count === 9 &&
+        cat.hasRoman &&
+        /community service/i.test(cat.first[1]) &&
+        /debagged/i.test(cat.first[1])
+      ) {
+        pass('W21', 'disciplinary: the incident catalogue carries the sanction text verbatim',
+          `${cat.count} entries; first is "${cat.first[0]}" → "${cat.first[1].slice(0, 70)}…"`);
+      } else {
+        fail('W21', 'disciplinary: the incident catalogue carries the sanction text verbatim',
+          `count=${cat.count} hasRoman=${cat.hasRoman} first=${JSON.stringify(cat.first)}`);
+      }
+    });
+
+    // ── W22 · launching a case puts it in the reports list ───────────
+    /* Read back out of Case Reports rather than off a banner, for the same
+       reason as W20: the banner is a claim, the list row is evidence. Reached
+       through the rail, because the mock's data lives in the page and a reload
+       would reset it to the seed. */
+    await step('W22', 'disciplinary: Launch Case creates a case that Case Reports lists', async () => {
+      await open('disciplinary-reports');
+      const before = await read(`
+        return Array.from(document.querySelectorAll('[data-admin-panel] table tbody tr'))
+          .map((tr) => tr.querySelector('td').textContent.trim());
+      `);
+
+      const launched = await read(`
+        const go = (label) => {
+          const item = Array.from(document.querySelectorAll('.rail-item'))
+            .find((a) => a.textContent.trim() === label);
+          if (!item) throw new Error('no rail entry "' + label + '"');
+          item.click();
+        };
+        const settled = async (panel) => {
+          for (let i = 0; i < 40; i += 1) {
+            const el = document.querySelector('[data-admin-panel]');
+            if (el && el.getAttribute('data-admin-panel') === panel && !el.querySelector('.ap-loading')) return;
+            await new Promise((r) => setTimeout(r, 250));
+          }
+          throw new Error('panel ' + panel + ' did not settle');
+        };
+        go('Launch Case');
+        await settled('disciplinary-launch-case');
+        /* The live form requires a student, an incident type and a date. */
+        const selects = Array.from(document.querySelectorAll('[data-admin-panel] select'));
+        const student = selects[0];
+        const studentOption = Array.from(student.options).find((o) => o.value);
+        const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+        setter.call(student, studentOption.value);
+        student.dispatchEvent(new Event('change', { bubbles: true }));
+        const type = Array.from(document.querySelectorAll('[data-admin-panel] select'))
+          .find((s) => Array.from(s.options).some((o) => /school prefect|chapel|Burglary/i.test(o.textContent)));
+        if (!type) {
+          return {
+            error: 'no incident type on the launch form',
+            offered: Array.from(document.querySelectorAll('[data-admin-panel] select'))
+              .map((s) => Array.from(s.options).map((o) => o.textContent.trim()).slice(0, 3)),
+          };
+        }
+        const typeOption = Array.from(type.options).find((o) => o.value);
+        setter.call(type, typeOption.value);
+        type.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 400));
+        const submit = Array.from(document.querySelectorAll('[data-admin-panel] button'))
+          .find((b) => b.textContent.trim() === 'Launch Case');
+        const wasDisabled = submit.disabled;
+        submit.click();
+        await new Promise((r) => setTimeout(r, 1800));
+        const banner = document.querySelector('.ap-banner');
+        return {
+          wasDisabled,
+          banner: banner ? banner.textContent.replace(/×$/, '').trim() : '(no banner)',
+        };
+      `);
+      if (launched.error) {
+        fail('W22', 'disciplinary: Launch Case creates a case that Case Reports lists',
+          `${launched.error}; selects offered ${JSON.stringify(launched.offered)}`);
+        return;
+      }
+      const after = await read(`
+        const item = Array.from(document.querySelectorAll('.rail-item'))
+          .find((a) => a.textContent.trim() === 'Case Reports');
+        item.click();
+        for (let i = 0; i < 40; i += 1) {
+          const el = document.querySelector('[data-admin-panel]');
+          if (el && el.getAttribute('data-admin-panel') === 'disciplinary-reports' && !el.querySelector('.ap-loading')) break;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        return Array.from(document.querySelectorAll('[data-admin-panel] table tbody tr'))
+          .map((tr) => tr.querySelector('td').textContent.trim());
+      `);
+      const gained = after.filter((c) => !before.includes(c));
+      if (gained.length === 1) {
+        pass('W22', 'disciplinary: Launch Case creates a case that Case Reports lists',
+          `submit was ${launched.wasDisabled ? 'disabled' : 'enabled'} once filled; banner "${launched.banner}"; ` +
+          `reports ${before.length} → ${after.length} with new ${gained[0]}`);
+      } else {
+        fail('W22', 'disciplinary: Launch Case creates a case that Case Reports lists',
+          `banner "${launched.banner}"; reports ${before.length} → ${after.length}, new ${JSON.stringify(gained)}`);
+      }
+    });
+
+    // ── W23 · the status control offers every state but the current one ──
+    await step('W23', 'disciplinary: the case detail offers every status except the current one', async () => {
+      await open('disciplinary-reports');
+      const detail = await read(`
+        const row = document.querySelector('[data-admin-panel] table tbody tr');
+        const caseNo = row.querySelector('td').textContent.trim();
+        const current = Array.from(row.querySelectorAll('td'))
+          .map((td) => td.textContent.trim())
+          .find((t) => /^(OPEN|PENDING|UNDER_REVIEW|DISMISSED|RESOLVED|APPEALED)$/.test(t));
+        Array.from(row.querySelectorAll('button')).find((b) => /View/.test(b.textContent)).click();
+        await new Promise((r) => setTimeout(r, 700));
+        const dlg = document.querySelector('[role="dialog"]');
+        if (!dlg) return { caseNo, current, opened: false };
+        const statusSelect = Array.from(dlg.querySelectorAll('select'))
+          .find((s) => Array.from(s.options).some((o) => /UNDER REVIEW/i.test(o.textContent)));
+        const choices = Array.from(statusSelect.options).map((o) => o.textContent.trim()).filter((t) => t !== 'Select new status');
+        const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+        const target = Array.from(statusSelect.options).find((o) => o.value && o.value !== current);
+        setter.call(statusSelect, target.value);
+        statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        /* A tick before reading the button. Vue re-renders on the microtask
+           queue, so a disabled-state read immediately after the change event
+           still reports the pre-change value, which reads as a control that
+           never enables itself. */
+        await new Promise((r) => setTimeout(r, 400));
+        const clicked = Array.from(dlg.querySelectorAll('button')).find((b) => b.textContent.trim() === 'Update status');
+        if (!clicked) return { caseNo, current, opened: true, choices, noUpdateButton: true };
+        const wasDisabled = clicked.disabled;
+        clicked.click();
+        await new Promise((r) => setTimeout(r, 1800));
+        const banner = document.querySelector('.ap-banner');
+        return {
+          caseNo, current, opened: true, choices, wasDisabled,
+          picked: target.value,
+          detailError: ((dlg.querySelector('.ap-form__error') || {}).textContent || '').trim(),
+          banner: banner ? banner.textContent.replace(/×$/, '').trim() : '(no banner)',
+          stillOpen: !!document.querySelector('[role="dialog"]'),
+        };
+      `);
+      const offersCurrent = detail.current && detail.choices.includes(detail.current);
+      if (detail.opened && detail.choices.length === 5 && !offersCurrent && /moved to/i.test(detail.banner)) {
+        pass('W23', 'disciplinary: the case detail offers every status except the current one',
+          `${detail.caseNo} was ${detail.current}; the control offered ${detail.choices.join(', ')} ` +
+          `(5 of the 6, its own state absent); banner "${detail.banner}"`);
+      } else {
+        fail('W23', 'disciplinary: the case detail offers every status except the current one',
+          `opened=${detail.opened} current=${detail.current} choices=${JSON.stringify(detail.choices)} ` +
+          `offersCurrent=${offersCurrent} picked=${detail.picked} disabled=${detail.wasDisabled} ` +
+          `detailError="${detail.detailError}" banner="${detail.banner}"`);
+      }
+    });
+
+    // ── W24 · booking a counselling session lands in View Cases ─────
+    await step('W24', 'counselling: Book Session creates a referral that View Cases lists', async () => {
+      await open('counselling-cases');
+      const before = await read(`
+        return Array.from(document.querySelectorAll('[data-admin-panel] table tbody tr'))
+          .map((tr) => tr.querySelector('td').textContent.trim());
+      `);
+      const booked = await read(`
+        const go = (label) => {
+          const item = Array.from(document.querySelectorAll('.rail-item'))
+            .find((a) => a.textContent.trim() === label);
+          if (!item) throw new Error('no rail entry "' + label + '"');
+          item.click();
+        };
+        const settled = async (panel) => {
+          for (let i = 0; i < 40; i += 1) {
+            const el = document.querySelector('[data-admin-panel]');
+            if (el && el.getAttribute('data-admin-panel') === panel && !el.querySelector('.ap-loading')) return;
+            await new Promise((r) => setTimeout(r, 250));
+          }
+          throw new Error('panel ' + panel + ' did not settle');
+        };
+        go('Book Session');
+        await settled('counselling-book-session');
+        const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+        const setterText = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+        const student = document.querySelector('[data-admin-panel] select');
+        setter.call(student, Array.from(student.options).find((o) => o.value).value);
+        student.dispatchEvent(new Event('change', { bubbles: true }));
+        const reason = document.querySelector('[data-admin-panel] textarea');
+        setterText.call(reason, 'Needs a careers conversation before the placement round.');
+        reason.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 400));
+        const submit = Array.from(document.querySelectorAll('[data-admin-panel] button'))
+          .find((b) => b.textContent.trim() === 'Save Referral');
+        const wasDisabled = submit.disabled;
+        const stillNeeded = (document.querySelector('[data-admin-panel] .ap-field__hint') || {}).textContent || '';
+        submit.click();
+        await new Promise((r) => setTimeout(r, 1800));
+        const banner = document.querySelector('.ap-banner');
+        return {
+          wasDisabled,
+          stillNeeded: stillNeeded.trim().slice(0, 60),
+          banner: banner ? banner.textContent.replace(/×$/, '').trim() : '(no banner)',
+        };
+      `);
+      const after = await read(`
+        Array.from(document.querySelectorAll('.rail-item'))
+          .find((a) => a.textContent.trim() === 'View Cases').click();
+        for (let i = 0; i < 40; i += 1) {
+          const el = document.querySelector('[data-admin-panel]');
+          if (el && el.getAttribute('data-admin-panel') === 'counselling-cases' && !el.querySelector('.ap-loading')) break;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        return Array.from(document.querySelectorAll('[data-admin-panel] table tbody tr'))
+          .map((tr) => tr.querySelector('td').textContent.trim());
+      `);
+      const gained = after.filter((c) => !before.includes(c));
+      if (gained.length === 1) {
+        pass('W24', 'counselling: Book Session creates a referral that View Cases lists',
+          `submit was ${booked.wasDisabled ? 'disabled' : 'enabled'} once filled; banner "${booked.banner}"; ` +
+          `cases ${before.length} → ${after.length} with new ${gained[0]}`);
+      } else {
+        fail('W24', 'counselling: Book Session creates a referral that View Cases lists',
+          `submit disabled=${booked.wasDisabled} banner "${booked.banner}"; ` +
+          `cases ${before.length} → ${after.length}, new ${JSON.stringify(gained)}`);
+      }
+    });
+
+    // ── W25 · a committee is saved with a named chair ───────────────
+    await step('W25', 'counselling: a committee with one chair is created and lists it', async () => {
+      await open('counselling-committee');
+      const before = await read(`
+        return document.querySelectorAll('[data-admin-panel] .ap-card').length;
+      `);
+      const saved = await read(`
+        Array.from(document.querySelectorAll('[data-admin-panel] button'))
+          .find((b) => b.textContent.trim() === 'New Committee').click();
+        await new Promise((r) => setTimeout(r, 600));
+        const dlg = document.querySelector('[role="dialog"]');
+        if (!dlg) return { opened: false };
+        /* An unnamed committee is refused, so the refusal is asserted first. */
+        Array.from(dlg.querySelectorAll('button')).find((b) => b.textContent.trim() === 'Create committee').click();
+        await new Promise((r) => setTimeout(r, 500));
+        const refusal = (dlg.querySelector('.ap-form__error') || {}).textContent || '';
+        const setterText = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        const nameInput = dlg.querySelector('input[type="text"]');
+        setterText.call(nameInput, 'Careers and Placement Committee');
+        nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+        Array.from(dlg.querySelectorAll('button')).find((b) => b.textContent.trim() === 'Add member').click();
+        await new Promise((r) => setTimeout(r, 400));
+        const memberRow = dlg.querySelector('.ap-seat-row');
+        const inputs = memberRow.querySelectorAll('input');
+        setterText.call(inputs[0], 'MOCK PRINCIPAL');
+        inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+        const seatSelect = memberRow.querySelector('select');
+        const setterSelect = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+        setterSelect.call(seatSelect, 'CHAIR');
+        seatSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 300));
+        Array.from(dlg.querySelectorAll('button')).find((b) => b.textContent.trim() === 'Create committee').click();
+        await new Promise((r) => setTimeout(r, 1800));
+        const banner = document.querySelector('.ap-banner');
+        return {
+          opened: true,
+          refusal: refusal.trim(),
+          closed: !document.querySelector('[role="dialog"]'),
+          banner: banner ? banner.textContent.replace(/×$/, '').trim() : '(no banner)',
+        };
+      `);
+      const after = await read(`
+        const cards = Array.from(document.querySelectorAll('[data-admin-panel] .ap-card'));
+        return {
+          count: cards.length,
+          chairs: cards.filter((c) => /Chair/.test(c.textContent)).map((c) => c.querySelector('.ap-card__title').textContent.trim()),
+        };
+      `);
+      if (
+        saved.opened &&
+        /Enter a committee name/.test(saved.refusal) &&
+        saved.closed &&
+        after.count === before + 1 &&
+        after.chairs.some((n) => /Careers and Placement/.test(n))
+      ) {
+        pass('W25', 'counselling: a committee with one chair is created and lists it',
+          `an unnamed committee was refused with "${saved.refusal}"; the named one saved ("${saved.banner}") ` +
+          `and appears as card ${after.count}, chair of ${after.chairs.join(', ')}`);
+      } else {
+        fail('W25', 'counselling: a committee with one chair is created and lists it',
+          `opened=${saved.opened} refusal="${saved.refusal}" closed=${saved.closed} ` +
+          `cards ${before} → ${after.count} chairs ${JSON.stringify(after.chairs)}`);
+      }
+    });
+
+    // ── W26 · a school role is a real second axis ─────────────────────
+    /* Two halves, because the honest behaviour splits in two:
+       HOLDING a role extends the session's effective permission set, and cannot
+       narrow the rail — `/admin/` is SUPER_ADMIN-only and a super administrator
+       holds a superset by design, so a Bursary grant has nothing left to remove.
+       PREVIEWING a role narrows the rail to that role alone, and is marked as a
+       preview so it cannot be mistaken for a change of authorisation.
+       Asserting only the second would hide the first; asserting only the first
+       would read as "the role did nothing". */
+    await step('W26', 'roles: holding extends the effective set, previewing narrows the rail', async () => {
+      await open('roles');
+      const before = await read(`
+        return {
+          rail: Array.from(document.querySelectorAll('.rail-item')).map((a) => a.textContent.trim()).filter(Boolean),
+          roles: JSON.parse(localStorage.getItem('AdminSchoolRoles') || '[]'),
+        };
+      `);
+
+      const held = await read(`
+        /* Matched on the name element rather than the cell's text, which also
+           carries the role's description and any "Held" badge. */
+        const rowOf = (name) => Array.from(document.querySelectorAll('[data-admin-panel] tbody tr'))
+          .find((tr) => {
+            const el = tr.querySelector('.ap-identity__name');
+            return el && el.textContent.trim().startsWith(name);
+          });
+        const row = rowOf('Bursary');
+        if (!row) {
+          return {
+            error: 'no Bursary row on the roles page',
+            names: Array.from(document.querySelectorAll('.ap-identity__name'))
+              .map((el) => el.textContent.trim()).slice(0, 8),
+          };
+        }
+        const name = row.querySelector('.ap-identity__name').textContent.trim();
+        Array.from(row.querySelectorAll('button'))
+          .find((b) => /Hold this role/.test(b.textContent)).click();
+        await new Promise((r) => setTimeout(r, 900));
+        return {
+          name,
+          roles: JSON.parse(localStorage.getItem('AdminSchoolRoles') || '[]'),
+          rail: Array.from(document.querySelectorAll('.rail-item')).map((a) => a.textContent.trim()).filter(Boolean),
+          banner: (document.querySelector('.ap-banner') || {}).textContent?.replace(/×$/, '').trim() || '',
+        };
+      `);
+      if (held.error) {
+        fail('W26', 'roles: holding extends the effective set, previewing narrows the rail',
+          `${held.error}; names seen ${JSON.stringify(held.names)}`);
+        return;
+      }
+
+      const previewed = await read(`
+        const row = Array.from(document.querySelectorAll('[data-admin-panel] tbody tr'))
+          .find((tr) => {
+            const el = tr.querySelector('.ap-identity__name');
+            return el && el.textContent.trim().startsWith('Bursary');
+          });
+        Array.from(row.querySelectorAll('button'))
+          .find((b) => /Preview this role|Clear preview/.test(b.textContent)).click();
+        await new Promise((r) => setTimeout(r, 900));
+        const callout = document.querySelector('[data-admin-panel] .ap-callout');
+        return {
+          rail: Array.from(document.querySelectorAll('.rail-item')).map((a) => a.textContent.trim()).filter(Boolean),
+          callout: callout ? callout.textContent.replace(/\\s+/g, ' ').trim() : '',
+          stillHeld: JSON.parse(localStorage.getItem('AdminSchoolRoles') || '[]'),
+        };
+      `);
+
+      const droppedOnHold = before.rail.filter((l) => !held.rail.includes(l));
+      const droppedOnPreview = before.rail.filter((l) => !previewed.rail.includes(l));
+      const keptBursary = previewed.rail.includes('Browse Store');
+      const lostDisciplinary = !previewed.rail.includes('Case Reports');
+
+      if (
+        held.roles.includes('Bursary') &&
+        droppedOnHold.length === 0 &&
+        droppedOnPreview.length > 0 &&
+        keptBursary &&
+        lostDisciplinary &&
+        /still governs every action/i.test(previewed.callout) &&
+        previewed.stillHeld.includes('Bursary')
+      ) {
+        pass('W26', 'roles: holding extends the effective set, previewing narrows the rail',
+          `holding ${held.name} added it to storage ${JSON.stringify(held.roles)} and left all ` +
+          `${before.rail.length} rail entries in place (a super admin holds a superset, so there is ` +
+          `nothing to remove); previewing it cut the rail to ${previewed.rail.length} — keeping ` +
+          `"Browse Store", dropping "Case Reports" — while the hold persisted`);
+      } else {
+        fail('W26', 'roles: holding extends the effective set, previewing narrows the rail',
+          `held=${JSON.stringify(held.roles)} droppedOnHold=${droppedOnHold.length} ` +
+          `rail ${before.rail.length} → preview ${previewed.rail.length} dropped=${droppedOnPreview.length} ` +
+          `keepsStore=${keptBursary} keepsDisciplinary=${!lostDisciplinary} ` +
+          `callout="${previewed.callout.slice(0, 60)}"`);
+      }
+    });
+
+    // ── W27 · Create Sale reserves stock ──────────────────────────────
+    /* The console's one dead control, found by `tools/find-dead-controls.py`:
+       a button that rendered, looked primary, and had no handler at all. Now a
+       real dialog, asserted on the two things the live sheet promises — the
+       validation wording, and that the sale holds its stock. The second is why
+       the Release and Cancel row actions mean anything. */
+    await step('W27', 'inventory/sales: Create Sale validates, then reserves its stock', async () => {
+      await open('sales');
+      const before = await read(`
+        return Array.from(document.querySelectorAll('[data-admin-panel] table tbody tr'))
+          .map((tr) => tr.querySelector('td').textContent.trim());
+      `);
+
+      const opened = await read(`
+        const btn = Array.from(document.querySelectorAll('[data-admin-panel] button'))
+          .find((b) => b.textContent.trim() === 'Create Sale');
+        if (!btn) return { error: 'no Create Sale button' };
+        btn.click();
+        await new Promise((r) => setTimeout(r, 700));
+        const dlg = document.querySelector('[role="dialog"]');
+        if (!dlg) return { error: 'the dialog did not open' };
+        return {
+          opened: true,
+          title: dlg.querySelector('.ap-dialog__title').textContent.trim(),
+          hasBuyer: !!dlg.querySelector('input[placeholder*="John Doe"]'),
+          hasContact: !!dlg.querySelector('input[placeholder*="Phone"]'),
+          hasSupplier: !!dlg.querySelector('select'),
+          hasAddItem: Array.from(dlg.querySelectorAll('button')).some((b) => b.textContent.trim() === 'Add Item'),
+          hasTotal: !!dlg.querySelector('.ap-total'),
+        };
+      `);
+      if (opened.error) {
+        fail('W27', 'inventory/sales: Create Sale validates, then reserves its stock', opened.error);
+        return;
+      }
+
+      /* Empty submit — the live sheet's first refusal, verbatim. */
+      const refused = await read(`
+        const dlg = document.querySelector('[role="dialog"]');
+        Array.from(dlg.querySelectorAll('button'))
+          .find((b) => b.textContent.trim() === 'Create Sale').click();
+        await new Promise((r) => setTimeout(r, 500));
+        return { err: (dlg.querySelector('.ap-form__error') || {}).textContent?.trim() || '',
+                 stillOpen: !!document.querySelector('[role="dialog"]') };
+      `);
+
+      /* Zero quantity — the live sheet's second refusal, verbatim.
+         The item select is addressed by position among the dialog's selects:
+         index 0 is the supplier, index 1 the stock item. Matching on text or on
+         "the first select with options" picked the supplier, which has options
+         of its own, and made the whole check pass against a sale of nothing. */
+      const zeroQty = await read(`
+        const dlg = document.querySelector('[role="dialog"]');
+        const selects = Array.from(dlg.querySelectorAll('select'));
+        const itemSel = selects[1];
+        if (!itemSel) return { err: '(no stock item select in the dialog)' };
+        const options = Array.from(itemSel.options).filter((o) => o.value);
+        if (!options.length) return { err: '(the stock item select offered no items)' };
+        const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+        setter.call(itemSel, options[0].value);
+        itemSel.dispatchEvent(new Event('change', { bubbles: true }));
+        const qty = dlg.querySelector('input[type="number"]');
+        const setterText = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        setterText.call(qty, '0');
+        qty.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 400));
+        Array.from(dlg.querySelectorAll('button'))
+          .find((b) => b.textContent.trim() === 'Create Sale').click();
+        await new Promise((r) => setTimeout(r, 500));
+        return {
+          picked: options[0].textContent.trim(),
+          err: (dlg.querySelector('.ap-form__error') || {}).textContent?.trim() || '',
+        };
+      `);
+
+      /* Now a valid sale. The total is read AFTER a tick: it is a computed
+         re-render, and reading it in the same task that changed the quantity
+         reports the pre-change figure — which read as "the total never moves". */
+      const created = await read(`
+        const dlg = document.querySelector('[role="dialog"]');
+        const qty = dlg.querySelector('input[type="number"]');
+        const setterText = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        const atZero = dlg.querySelector('.ap-total strong').textContent.trim();
+        setterText.call(qty, '2');
+        qty.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 500));
+        const total = dlg.querySelector('.ap-total strong').textContent.trim();
+        Array.from(dlg.querySelectorAll('button'))
+          .find((b) => b.textContent.trim() === 'Create Sale').click();
+        await new Promise((r) => setTimeout(r, 1800));
+        const banner = document.querySelector('.ap-banner');
+        return {
+          atZero, total,
+          closed: !document.querySelector('[role="dialog"]'),
+          banner: banner ? banner.textContent.replace(/×$/, '').trim() : '',
+        };
+      `);
+      const after = await read(`
+        return Array.from(document.querySelectorAll('[data-admin-panel] table tbody tr'))
+          .map((tr) => tr.querySelector('td').textContent.trim());
+      `);
+
+      const naira = (s) => Number(String(s).replace(/[^0-9.]/g, ''));
+      const gained = after.filter((r) => !before.includes(r));
+      if (
+        opened.opened &&
+        opened.hasBuyer && opened.hasContact && opened.hasSupplier &&
+        opened.hasAddItem && opened.hasTotal &&
+        /Add at least one stock item to the sale\./.test(refused.err) && refused.stillOpen &&
+        /Quantities must be greater than zero\./.test(zeroQty.err) &&
+        naira(created.atZero) === 0 &&
+        naira(created.total) > 0 &&
+        created.closed && /created\. Stock reserved\./.test(created.banner) &&
+        gained.length === 1
+      ) {
+        pass('W27', 'inventory/sales: Create Sale validates, then reserves its stock',
+          `"${opened.title}" with buyer/contact/supplier/items/total; refused "${refused.err}" then ` +
+          `"${zeroQty.err}" for ${zeroQty.picked}; the running total moved ` +
+          `${created.atZero} → ${created.total} as quantity went 1 → 2; created ${gained[0]} — ` +
+          `"${created.banner}"`);
+      } else {
+        fail('W27', 'inventory/sales: Create Sale validates, then reserves its stock',
+          `opened=${JSON.stringify(opened)} empty="${refused.err}" zero="${zeroQty.err}" ` +
+          `picked=${zeroQty.picked} total ${created.atZero} → ${created.total} ` +
+          `closed=${created.closed} banner="${created.banner}" gained=${JSON.stringify(gained)}`);
+      }
+    });
+
     // ── report ──────────────────────────────────────────────────────────
     const tally = { PASS: 0, FAIL: 0, SKIPPED: 0 };
     for (const r of results) tally[r.verdict] = (tally[r.verdict] || 0) + 1;
@@ -1081,7 +1618,37 @@ async function main() {
     );
     process.exitCode = tally.FAIL === 0 ? 0 : 1;
   } catch (e) {
+    /*
+     * An abort used to print only the error's first line, which is how this file
+     * managed to abort at W11 with "Cannot read properties of undefined (reading
+     * 'click')" and no way to tell whether the panel had failed to load, whether
+     * the wrong panel was mounted, or whether the page had thrown. Every abort
+     * now dumps the state a probe would have read, so the next one is
+     * diagnosable from the log alone.
+     */
     console.error('ABORTED:', String(e).split('\n')[0]);
+    try {
+      const state = await browser.evaluate(`
+        const p = document.querySelector('[data-admin-panel]');
+        return {
+          url: location.href.slice(-60),
+          panelAttr: p ? p.getAttribute('data-admin-panel') : null,
+          loading: !!(p && p.querySelector('.ap-loading')),
+          errorShown: p ? ((p.querySelector('.ap-error') || {}).textContent || null) : null,
+          rows: p ? p.querySelectorAll('tbody tr, .ap-card').length : 0,
+          buttons: p ? Array.from(p.querySelectorAll('button')).map((x) => x.textContent.trim()).slice(0, 12) : [],
+          dialogOpen: !!document.querySelector('[role="dialog"]'),
+          dialogTitle: (document.querySelector('[role="dialog"] .ap-dialog__title') || {}).textContent || null,
+        };
+      `);
+      console.error('ABORT STATE:', JSON.stringify(state, null, 2));
+    } catch (probeError) {
+      console.error('ABORT STATE unavailable:', String(probeError).split('\n')[0]);
+    }
+    const consoleErrs = browser.consoleErrors || [];
+    const pageErrs = browser.pageErrors || [];
+    if (consoleErrs.length) console.error('CONSOLE ERRORS:', consoleErrs.slice(0, 5));
+    if (pageErrs.length) console.error('PAGE ERRORS:', pageErrs.slice(0, 5));
     for (const r of results) {
       console.log(`  ${r.verdict.padEnd(8)}${r.id.padEnd(5)}${r.name}`);
       console.log(`      ${r.verdict === 'PASS' ? '✓' : '→'} ${r.detail}`);

@@ -42,7 +42,7 @@ so "we did not break them" is a checked claim rather than an assumption.
 | Layer | File | What |
 |---|---|---|
 | Types | `src/types/admin.ts` | The module-specific shapes (wallet, attendance sheet, fee, result entry, audit log) |
-| Registry | `src/types/admin-registry.ts` | 58 modules as data; 33 seed roles; the permission-module catalogue; the three unavailable-settings entries |
+| Registry | `src/types/admin-registry.ts` | 66 modules as data; 33 seed roles and the permissions each grants; the permission-module catalogue; the three unavailable-settings entries |
 | Contract | `src/api/contract.ts` | 42 actions (17 reads, 25 writes) |
 | Mock | `src/api/mockAdmin.ts` | Seed data for every list, and a handler per action |
 | Permissions | `src/lib/permissions.ts` | +98 codes, three sentinels and their resolution, `registerAdminModuleLookup` |
@@ -85,7 +85,7 @@ workflow checks, not by reading the code. They are listed in `ui-audit.md` and
 
 | Claim | Check | Script |
 |---|---|---|
-| Every panel mounts; none logs an error | 66-panel walk, 0 console / 0 page / 0 request failures | `verify-walk.js`, `cdp-walk.mjs` |
+| Every panel mounts; none logs an error | 74-panel walk, 0 console / 0 page / 0 request failures | `verify-walk.js`, `cdp-walk.mjs` |
 | Every module has a rail entry and a panel | registry ↔ rail ↔ panel-map cross-check | `check-admin-parity.mjs` |
 | Every permission resolves, and unknown actions fail closed | sentinel resolution against every module | `check-rbac.mjs` |
 | Every template component is imported | template-tag scan | `check-template-components.py` |

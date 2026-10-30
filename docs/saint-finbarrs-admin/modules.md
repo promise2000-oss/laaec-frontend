@@ -38,6 +38,31 @@ rail sections (`Academic Settings`, `Store`) are cross-cutting and one
 | 14 | **Results Management** | 7 | `/results/windows`, `/results/enter`, `/results/queue`, `/results/committee`, `/results/grading`, `/results/students`, `/results/report-cards`. Upload windows, mark entry, a vetting queue, committee tagging, the grading scale, published results, report cards. **OBSERVED** |
 | — | **System** | 8 | `/system/general-settings`, `/system/academic-settings`, `/system/branding`, `/system/notification-settings`, `/system/system-configuration`, `/system/audit-logs`, `/system/backups`, `/system/feature-toggles`. Not in the app's own rail — reached from the dashboard. **OBSERVED** |
 
+### The two modules built on shared components
+
+**Disciplinary** and **Counselling** are the same three page shapes with different
+nouns: a standing catalogue or team list, a committee with seats, a sectioned
+referral form, and a filtered case list. The deployed app is written the same way —
+`counselling-cases.tsx` and `disciplinary-reports.tsx` are siblings, and both
+reach for the same `ApiCommitteeMember`.
+
+So they are eight panels on **two** components:
+
+| Component | Panels | Page shape |
+|---|---|---|
+| `AdminCaseModulePanel.vue` | `disciplinary-incidents`, `disciplinary-committees`, `disciplinary-launch-case`, `counselling-book-session`, `counselling-committee` | catalogue, committee, sectioned form |
+| `AdminCaseWorkPanel.vue` | `disciplinary-reports`, `counselling-cases`, `counselling-reports` | filtered list + detail dialog |
+
+Which module a panel is serving is read from **its own panel id**, never from a
+prop. That is deliberate: a prop kept in step with the id by hand is a prop that
+will eventually be wrong, and the failure would be a counselling panel saving a
+disciplinary case.
+
+Their actions are not new either. Both modules were already built for this
+project's `/teacher/` console, with handlers and types in `types/teacher.ts`; the
+admin panels issue those same actions against the same records. Only the two case
+deletes are new. See `parity-report.md` §10.
+
 ### Not a rail section
 
 **System** (`/system/*`) is reachable and fully populated but is **not** in the
@@ -52,7 +77,7 @@ Every list-shaped module in the live app is the same page: a heading, a
 description, a search box, zero to two filters, a table, a row-action menu and a
 create/edit dialog. The differences are a column list and a field list. That
 observation is what makes the implementation tractable, and it is why
-`src/types/admin-registry.ts` describes 58 modules as data while one component
+`src/types/admin-registry.ts` describes 66 modules as data while one component
 renders the 13 of them that are plain table-and-form. A 59th panel — the summary
 dashboard — mounts through the same router but has no registry entry, because a
 registry entry describes a list and the dashboard is not one. The other 46 are

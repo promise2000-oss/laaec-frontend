@@ -147,6 +147,12 @@ it is recorded in `parity-report.md`.
 | A module SUPER_ADMIN cannot hold is not offered | Walked the rail as SUPER_ADMIN and asserted no permission-gated control was missing | PASS |
 | A missing permission removes the **control**, not just the write | Workflow check **W16**: narrowed the live session's grants, watched Approve/Reject disappear from the DOM while View remained, then restored them and watched the buttons return without a reload | PASS |
 | Another claim cannot reach `/admin/` | Workflow check **W16c**: signed in as a school-admin fixture, asked for `/admin/?panel=leave-approvals`, landed on `/control/` with no module mounted | PASS |
+| A grant made in the permissions dialog is really persisted | Workflow check **W11**: toggled one permission, watched the dialog's live count move 0 → 1, saved, and read the banner and the list's own count back | PASS |
+| The permission dialog is usable by keyboard and by touch | Measured in a browser: 178 checkboxes, **all 178 named**; Tab wraps from the last of 182 focusable controls to the first and Shift+Tab back; a Tab in the middle is not intercepted; every target in the dialog is ≥44 px at 390 px wide | PASS |
+
+The dialog's behaviour is recorded in `ui-audit.md`; what it cost to get there,
+and the six origin stylesheet rules that had to be outranked, is in
+`verification-checklist.md`.
 
 W16 is the load-bearing one. It is the difference between "the button is there
 and the write is refused" and "the button is not there" — and the second is what
@@ -174,3 +180,111 @@ SOURCE-derived or absent. Specifically:
 
 `workflows.md` for what an operator actually does, `api-observations.md` for the
 boundary, `feature-matrix.md` for what was built.
+## 5. The 33 school roles as a second authorisation axis
+
+**BEFORE.** A session carried one LAEC claim and nothing else. That claim gated
+whether `/admin/` opened; inside it, every module was reachable. The 33 school
+roles were a table: 33 rows, assignable to other accounts, and inert for the
+operator in front of the console. That was recorded as a scope decision rather
+than hidden, but it was a real gap — on the live portal the roles *are* the
+authorisation surface.
+
+**NOW.** Two axes.
+
+| Axis | What it decides | Source of truth | Where it is read |
+|---|---|---|---|
+| LAEC claim | Whether `/admin/` opens at all | `AdminRole` in storage | router guard |
+| School roles | What is reachable once open | `SCHOOL_ROLE_PERMISSIONS`, `session.schoolRoles` | rail filter, `sessionCan`, and the `callApi` gate |
+
+`effectivePermissions` unions both, and **all three consumers read that same
+union** — the rail, the page's own control gate, and the transport. That
+agreement is the point: an earlier shape let a role change the navigation while
+leaving the gate untouched, which is the same navigation-versus-function
+disagreement `SUPER_ADMIN_PERMISSIONS` was introduced to remove for a different
+reason, and it was fixed the same way.
+
+**What is OBSERVED.** The live `/roles` table, 33 rows: each role's name, its
+user count, and its permission count. Those figures are in `SEED_ROLES`.
+
+**What is NOT VERIFIED.** The permissions each role actually holds. They sit
+behind a per-role drilldown this audit did not open, so `SCHOOL_ROLE_PERMISSIONS`
+is a **reconstruction**, not a transcription:
+
+- **Membership** is this console's own — each role's documented remit (its
+  `description` in `SEED_ROLES`) mapped against the 29 permission modules the
+  live `/permissions` page groups by. The *codes* are the real ones.
+- **Counts are not forced to match.** Truncating a role's module membership to
+  its observed count would have produced the right total and the wrong codes — a
+  nicer number and less truth. Four roles match exactly; the rest do not, and the
+  gap is below rather than hidden.
+
+The roles panel shows both numbers on every row, so the divergence is visible
+where it matters and each figure has a `title` explaining it.
+
+### Observed count against what this console grants
+
+| Kitchen | 0 | 0 | exact |
+| Librarian | 0 | 0 | exact |
+| Management | 0 | 0 | exact |
+| Sanitation | 0 | 0 | exact |
+| Bursary | 18 | 17 | live higher by 1 |
+| Accountant | 10 | 8 | live higher by 2 |
+| Store/Sales Staff | 6 | 8 | live lower by 2 |
+| Secretary | 34 | 37 | live lower by 3 |
+| Teacher | 55 | 58 | live lower by 3 |
+| Clinicals | 14 | 18 | live lower by 4 |
+| Counsellor Team | 27 | 23 | live higher by 4 |
+| House Parent | 23 | 27 | live lower by 4 |
+| Inventory/Stock | 13 | 17 | live lower by 4 |
+| Facility & Maintenance | 17 | 22 | live lower by 5 |
+| Special Lesson Formator | 17 | 23 | live lower by 6 |
+| Super Admin | 154 | 147 | live higher by 7 |
+| Teacher & Parent | 28 | 35 | live lower by 7 |
+| Staff | 15 | 23 | live lower by 8 |
+| Assistant College Administrator | 137 | 147 | live lower by 10 |
+| ICT | 137 | 147 | live lower by 10 |
+| Assistant Admin | 3 | 14 | live lower by 11 |
+| Assistant Administrator | 3 | 14 | live lower by 11 |
+| Parent | 21 | 33 | live lower by 12 |
+| Asst. Admin Sec. | 16 | 29 | live lower by 13 |
+| College Administrator | 132 | 147 | live lower by 15 |
+| HR Officer | 46 | 27 | live higher by 19 |
+| Vice Principal | 91 | 68 | live higher by 23 |
+| Principal | 91 | 67 | live higher by 24 |
+| Head Teacher | 50 | 79 | live lower by 29 |
+| Sectional Head (Senior) | 47 | 79 | live lower by 32 |
+| Sectional Head (Junior) | 40 | 79 | live lower by 39 |
+| Admin | 113 | 73 | live higher by 40 |
+| Administrator | 115 | 73 | live higher by 42 |
+
+### The two controls
+
+**Hold this role** grants a role to *this* session, taking effect immediately:
+the rail re-filters and every gated control re-evaluates in the same tick, because
+`setSchoolRole` re-derives `permissions` rather than appending a code.
+
+**Preview this role** exists because of a structural fact, not convenience.
+`/admin/` is `SUPER_ADMIN`-only (router guard, D-11) and a super administrator
+holds a superset of every other role **by design**. So holding Bursary cannot
+narrow a super administrator's rail — correctly, because a super administrator is
+entitled to everything. Without the preview the 33 roles would still be
+unobservable in this console.
+
+The preview applies the chosen role's grants *instead of* the session's own, and
+is marked in the UI as a preview. The asymmetry is deliberate and is the safety
+property: `navPermissions` is read by the rail and `sessionCan`, while the
+transport gate keeps reading `permissions` and the held roles. A preview can
+therefore narrow what is offered and can never widen what a call would be
+permitted to do. Verified in `workflows.md`, W26.
+
+`filterNav` grew an explicit `ignoreSuperAdmin` flag for this. It exists because
+`filterNav` short-circuits for `SUPER_ADMIN`, which would have made the preview a
+no-op; the flag is named rather than inferred from the permission list, because
+"this session is a super admin" and "ignore that" are different requests.
+
+### What is still NOT VERIFIED, and cannot be
+
+**No non-admin session was ever signed in on the live portal.** Every claim about
+what another role sees there remains SOURCE or absent. What is verified now is
+narrower and stated as such: this console's own model, under this console's own
+grant, with the divergence from the live figures tabulated above.

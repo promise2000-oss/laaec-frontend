@@ -28,8 +28,20 @@ const OUT = resolve(ROOT, '.rbac-check');
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
+/*
+ * `--bundle`, and not as a nicety.
+ *
+ * Without it esbuild transpiles each entry on its own and leaves its runtime
+ * imports as bare specifiers. Those then resolve relative to `.rbac-check/`,
+ * one directory below the project root, so `../types/admin-registry` looks for
+ * `<root>/types/admin-registry` — which is not where the source is, and is not
+ * there at all. This only surfaced once `roles.ts` took a runtime (not
+ * `import type`) dependency: with type-only imports esbuild erased them and the
+ * emitted files happened to be self-contained. Bundling makes the check
+ * independent of which files import what at runtime.
+ */
 execSync(
-  `npx esbuild src/lib/nav.ts src/lib/roles.ts src/lib/permissions.ts --format=esm --outdir=${JSON.stringify(OUT)} --log-level=error`,
+  `npx esbuild src/lib/nav.ts src/lib/roles.ts src/lib/permissions.ts --bundle --format=esm --outdir=${JSON.stringify(OUT)} --log-level=error`,
   { cwd: ROOT, stdio: 'pipe' },
 );
 

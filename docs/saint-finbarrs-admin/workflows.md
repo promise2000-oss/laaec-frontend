@@ -32,10 +32,19 @@ a dialog opened to read its copy was dismissed without choosing an item.
 | W17 | Maintain stock and restock | `/inventory/stock` | `stock` | PASS |
 | W18 | Take an order from the queue and confirm payment | `/store/queue` | `queue` | PASS |
 | W19 | Review the audit trail | `/system/audit-logs` | `audit-logs` | PASS |
-| W20 | Browse the store and manage the cart | `/store`, `/store/cart` | `store`, `cart` | PASS |
+| W20 | Browse the store and check out | `/store`, `/store/cart` | `store`, `cart` | PASS |
+| W20b | Bursary refuses a confirmation with no reference | `/store/queue` | `queue` | PASS |
+| W20c | Bursary confirms against a reference | `/store/queue` | `queue` | PASS |
+| W21 | Read the school's disciplinary rule book | `/disciplinary/incidents` | `disciplinary-incidents` | PASS |
+| W22 | Launch a disciplinary case | `/disciplinary/launch-case` | `disciplinary-launch-case` | PASS |
+| W23 | Move a case through its statuses | `/disciplinary/reports` | `disciplinary-reports` | PASS |
+| W24 | Refer a student for counselling | `/counselling/book-session` | `counselling-book-session` | PASS |
+| W25 | Create a counselling committee with a chair | `/counselling/committee` | `counselling-committee` | PASS |
+| W26 | Hold and preview a school role | `/roles` | `roles` | PASS |
 
-W20–W21 are the two the live app supports and this project does not reproduce as
-writes; see the end of this document.
+Thirty-one checks, all passing. W21–W26 are the two modules and the roles axis;
+W20b and W20c are the bursary's two decisions, which were previously one
+confirmation that needed no input.
 
 ## The four that carry the most behaviour
 
@@ -145,7 +154,7 @@ columns, filters, fields, toolbar and row actions as data;
 for.
 
 A new table-shaped module is a registry entry and **no component at all**. That is
-the whole reason 59 panels needed only 21 components - and 13 of them needed none.
+the whole reason 67 panels needed only 23 components - and 13 of them needed none.
 
 ## Workflows deliberately NOT implemented
 
@@ -164,23 +173,66 @@ quietly omitted.
 | Student CSV export page | `/students/export` | Same — *Under construction*. Export is available from the student list instead. |
 | Password reset, profile, unauthorized | `/forgot-password`, `/profile`, `/unauthorized` | Already exist in this project on other routes. |
 
-## The one workflow with a real gap
+## Three findings that came out of writing the checks
 
-**W20 · Cart checkout.** The live store's cart is a real transaction with
-`/store/cart`, `/store/checkout` and a payment-reference verification. Here
-`store` and `cart` render the catalogue and the cart contents, and `queue` renders
-the confirmation queue with Confirm / Refund actions, but **checkout itself is not
-issued** — the button is absent rather than wired to a mock that would be
-inventing a payment flow. Recorded as **Partial** in `feature-matrix.md`, not
-hidden.
+### W20 · Checkout was not absent — it was reporting success for nothing
 
-W14, by contrast, is complete, and it took two fixes to get there. The fee
-breakdown's *New Payment* is a link carrying `?panel=fee-payments&action=create`,
-and both halves of that were missing: the panel-switch watcher in `AdminView` (a
-router navigation to the same route does not remount the view, so the address bar
-changed while the previous module stayed on screen) and the `action=create` reader
-in the generic panel. A document-load test would have missed the first one
-entirely, because loading that URL fresh always worked.
+This entry previously read "the button is absent rather than wired to a mock that
+would be inventing a payment flow". That was wrong about the code.
+`AdminInventoryPanel` **did** have a Checkout button. It looped `ADD_TO_CART` over
+its own cart lines — adding to the thing it had just emptied, which cannot create
+an order even in principle — and then set the banner *"Order placed. It is now in
+the bursary confirmation queue."*
+
+A control that claims an outcome it did not produce is worse than a missing one:
+a missing control is noticed, a lying one is not. The check asserts on the **queue
+gaining a row**, not on the banner, precisely because a banner is a claim and a
+queue row is evidence.
+
+It is now a real transaction. Two things it exposed while being written:
+
+- **The cart has to be the server's.** It used to be a panel-local array, so there
+  was nothing to check out *against*. The mock owns `StoreCart` now.
+- **`onMounted` was the only load.** `AdminInventoryPanel` serves eleven panels
+  from one component, so switching from `store` to `queue` through the rail
+  mounted the queue with no read behind it and rendered its empty state over four
+  orders. Only a full page reload papered over that — which is not how anyone
+  moves around a console. Now a `watch` on the module id.
+
+W20b and W20c are the same dialog with opposite outcomes, so the refusal in W20b
+is the mock refusing rather than the dialog being unusable. `"Payment reference is
+required."` is enforced in the mock, not in the panel.
+
+### W23 · Reading a button's disabled state needs a tick
+
+The probe set a `<select>`, dispatched `change`, and immediately read the Update
+button's `disabled`. It reported `true` — because Vue re-renders on the microtask
+queue, so that read still saw the pre-change value. The control looked broken and
+was not. The check now waits before reading.
+
+### W22 · The mock lives in page memory, so the write has to be read back without a reload
+
+W20 and W22 both assert on a list that only changes because of the action under
+test. Reaching it by URL reloads the page, which resets the mock to its seed — so
+the check would pass or fail for the wrong reason. Both go through `.rail-item`
+clicks instead, which is also how a person moves between panels.
+
+W22 found a second mock bug this way: `orderSeq` was seeded to 2, left over from
+when only two orders existed, so the first order placed came out as
+`ORD-2026-0006` colliding with a seeded order of that number — two indistinguishable
+rows under the same number. It is now derived from the seed, so adding a seeded
+order cannot reintroduce it.
+
+### W26 · Two halves, because the honest behaviour splits in two
+
+Holding a role cannot narrow a super administrator's rail, and that is correct:
+`/admin/` is `SUPER_ADMIN`-only and a super administrator holds a superset by
+design. So "did the role do anything" has two different right answers — holding
+extends the effective set, previewing narrows the rail — and a check asserting
+either alone would read as the other.
+
+The check therefore asserts both, plus the safety asymmetry: previewing cut the
+rail from 77 entries to 13 while the transport kept enforcing the claim.
 
 ## Read next
 

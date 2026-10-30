@@ -121,6 +121,71 @@ its own console tables (D-59). **Verified W18** — at a 390 px viewport the pag
 `scrollWidth` equals its `clientWidth` (390), and the panel does not overflow its
 wrapper.
 
+## The permissions dialog, rebuilt
+
+The `Permissions — {Role}` dialog is the densest surface in the console — 29
+groups, 149 permissions, a select-all per group — and measuring it turned up
+defects that reading the markup did not.
+
+**Every checkbox was 102 px wide.** `admin-page.css:702` writes one element rule
+for the console's fields, `.page-admin input, .page-admin select { width: 100%;
+padding: 13px 14px }`, written for the origin's text inputs and never narrowed
+to them. It lands on `input[type=checkbox]` too. The neutralising block in
+`admin-panel-page.css` *is* narrowed to types, and `checkbox` was not on its list,
+so nothing overrode it: measured **102.6 × 13 px** inside a 264 px row. This read
+as "the checkbox sits far from its label" and was actually a control stretched to
+a third of the row. Replaced with a real checkbox primitive — `appearance: none`,
+18 px, checked/indeterminate/disabled states and a focus ring that does not move
+the control. Keyed on `.page-admin`, not `.ap-admin-panel`, because a dialog opened
+from inside a panel is a sibling overlay and never a descendant of it.
+
+**`<label>` and `<header>` both carry origin rules that beat a class.**
+`.page-admin label` sets `font-size: .76rem; font-weight: 800; text-transform:
+uppercase; letter-spacing: .1em; margin-bottom: .45rem`; `.page-admin header`
+sets `position: fixed`, a navy gradient, `flex-direction: column` and
+`justify-content: space-between`. Both are element-scoped, so a single class does
+not outrank them, and the group header's own divider was being erased by
+`.page-admin .ap-admin-panel header`'s blanket `border: 0`. The permission labels
+were rendering as tracked-out small caps **and** carrying a 7.2 px margin the
+matrix's own `gap` never asked for; the group header was stacking its checkbox
+above the group name. Each override is written with an extra class ahead of the
+child combinator, so it wins on specificity rather than on source order.
+
+**There were two scrollers, so the footer was unreachable.** The matrix capped
+itself at 22 rem with `overflow-y: auto` inside `.ap-dialog__body`, which is
+itself the scroller. Wheel over the list scrolled the list, wheel over the gaps
+scrolled the dialog, and neither reached the footer. The matrix now renders at
+full height: measured **1 scrollable element** in the dialog — the body, with
+5579 px of overflow. The edge shadows are four background layers on the body, two
+`background-attachment: local` covers over two `scroll` shadows, so a shadow
+appears only on the side that still has content and no scroll listener is needed.
+
+**The focus trap was documented but absent.** `AdminDialog`'s comment claimed
+one; the handler only handled Escape, so Tab walked straight out of the dialog
+while `aria-modal="true"` told assistive technology the page behind was inert.
+Now implemented, wrapping at both ends only. **Verified:** Tab from the last of
+182 focusable controls returns to the first, Shift+Tab from the first returns to
+the last, a Tab in the middle is not intercepted, and focus never leaves.
+
+Three smaller ones: the close control was a text `&times;` in a button sized by
+font metrics (24 × 27 px) and is now a fixed 32 × 32 with a 1.7-stroke icon,
+growing to 44 × 44 on a coarse pointer or a narrow viewport; the selection count
+was a prose line and is now a live pill plus a footer count; and `Clear all` and
+the dialog search did not exist at all.
+
+**Deliberately unchanged:** group select-all acts on the whole group even while a
+search is filtering the matrix. Selecting only the visible rows is what people
+expect from a filtered list, but the `2/8` badge counts the group, so the two
+would disagree with no way to see which had happened. The toolbar says so
+instead: *"Showing 3 of 149 permissions. A group's select all still covers the
+whole group."*
+
+**`aria-label`, not `aria-labelledby`.** `aria-labelledby` pointing at the `<h3>`
+is the better pattern, but this component exposes a `#header` slot that may
+replace the `<h3>` entirely. A dangling `aria-labelledby` computes an *empty*
+accessible name and does not fall back to `aria-label`, so a slot consumer would
+silently produce an unnamed dialog.
+
 ## Observed live defects, recorded and not reproduced as bugs
 
 These are the live deployment's defects. They are documented rather than fixed,
