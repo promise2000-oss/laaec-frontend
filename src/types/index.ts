@@ -254,7 +254,59 @@ export interface AdminAccount {
 }
 
 /**
- * An archdiocesan school (PRD D23).
+ * Lifecycle state of a school in the multi-school platform (multi-school spec §1).
+ *
+ * ACTIVE    — reachable at its subdomain, appears in dropdowns.
+ * INACTIVE  — registered but not yet switched on; the portal refuses it.
+ * SUSPENDED — administratively blocked; the portal refuses it and protected
+ *             examination services are denied until it is restored.
+ *
+ * The three are kept distinct rather than collapsed into a boolean because the
+ * spec treats "not yet live" and "blocked" as different administrative acts with
+ * different restore paths (activate vs. restore).
+ */
+export type SchoolStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+
+/**
+ * Per-school identity shown when a user loads the school's own subdomain
+ * (multi-school spec §5). Every field is optional: a school with no branding
+ * configured falls back to the platform's own defaults rather than rendering
+ * empty controls.
+ */
+export interface SchoolBranding {
+  /** Absolute or app-relative logo URL. */
+  logoUrl?: string;
+  /** Primary brand colour, as any CSS colour value (`#123456`, `blue`, …). */
+  primaryColor?: string;
+  /** Secondary/accent brand colour. */
+  secondaryColor?: string;
+  /** Public contact email shown in the school portal footer. */
+  contactEmail?: string;
+  /** Public contact phone. */
+  contactPhone?: string;
+  /** Postal address; overrides the record's top-level `Address` when set. */
+  address?: string;
+  /** Examination instructions rendered before a candidate starts a paper. */
+  examInstructions?: string;
+}
+
+/**
+ * School-scoped counters shown on the school-specific dashboard (spec §1,
+ * "view school-specific statistics"). The mock derives these from its own
+ * fixtures where it can and reports zeros where the fixture set has no data for
+ * a school; a real backend would aggregate them per tenant.
+ */
+export interface SchoolStats {
+  students: number;
+  teachers: number;
+  exams: number;
+  questions: number;
+  results: number;
+}
+
+/**
+ * An archdiocesan school (PRD D23), extended into a multi-school tenant
+ * (multi-school spec §1, §3, §5).
  *
  * The origin hardcodes ten schools in `SCHOOL_NAMES` / `SCHOOL_ORDER` (see
  * `src/lib/console.ts`). That list is the SEED for this record: the ten served
@@ -266,6 +318,16 @@ export interface AdminAccount {
  * `builtin` marks the ten seeded schools so the panel can label them and, if a
  * delete is ever added, protect them the way the origin protects the original
  * School Admin account.
+ *
+ * The multi-school fields are what turn the registry into tenants:
+ *   - `slug` is the URL-friendly subdomain (`greenfield-international`) that
+ *     `lib/tenant.ts` resolves from a request hostname; it is generated
+ *     automatically at onboarding and is unique across the registry.
+ *   - `status` gates whether the subdomain serves the portal at all.
+ *   - `groupId` is the school's SINGLE group membership (spec §7 exclusive
+ *     foreign key): `null` means ungrouped, and a school is never in two groups
+ *     at once. Group membership is derived from this column, not stored twice.
+ *   - `branding` and `stats` are the school-specific identity and counters.
  */
 export interface SchoolRecord {
   /** Short SchoolID, uppercased: SFC, SGC, or a newly added code. */
@@ -276,6 +338,44 @@ export interface SchoolRecord {
   Address?: string;
   /** True for the ten schools hardcoded on the origin. */
   builtin?: boolean;
+  /** Unique subdomain label; the school's portal URL is `https://<slug>.laaec.com`. */
+  slug: string;
+  /** Lifecycle state; defaults to ACTIVE so the seeded ten stay reachable. */
+  status: SchoolStatus;
+  /** Exclusive group membership (spec §7); `null` when the school is ungrouped. */
+  groupId: string | null;
+  /** Optional school-specific identity for its own portal (spec §5). */
+  branding?: SchoolBranding;
+  /** School-scoped dashboard counters (spec §1). */
+  stats?: SchoolStats;
+  /** ISO timestamp the school was onboarded. */
+  createdAt: string;
+  /** ISO timestamp of the last edit, status change or URL regeneration. */
+  updatedAt: string;
+}
+
+/**
+ * A named group of schools (multi-school spec §2).
+ *
+ * Membership is NOT stored here: a school's `groupId` is the single source of
+ * truth (spec §7 exclusive foreign key), and `GET_SCHOOL_GROUPS` derives each
+ * group's members from the registry. Storing the member list on both sides is
+ * exactly how a group and its schools drift apart — so there is one column, and
+ * deleting a group simply nulls it on its schools, never touching the schools
+ * themselves (spec §2, "delete groups without accidentally deleting the
+ * schools").
+ */
+export interface SchoolGroup {
+  /** Stable identifier; also the value of `SchoolRecord.groupId`. */
+  id: string;
+  /** Display name, e.g. "Group A". */
+  name: string;
+  /** Optional human description of the group's purpose. */
+  description?: string;
+  /** ISO timestamp the group was created. */
+  createdAt: string;
+  /** ISO timestamp of the last rename/description edit. */
+  updatedAt: string;
 }
 
 /**

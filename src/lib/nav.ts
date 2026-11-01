@@ -179,6 +179,7 @@ const ADMIN_GROUPS: NavGroup[] = [
       { id: 'results', label: 'Results Center', icon: 'chart', permission: 'results.read' },
       { id: 'student-directory', label: 'Student Directory', icon: 'users', permission: 'students.read' },
       { id: 'schools', label: 'Schools', icon: 'building', permission: 'schools.read' },
+      { id: 'school-groups', label: 'School Groups', icon: 'layers', permission: 'school_groups.read' },
       { id: 'admins', label: 'School Admins', icon: 'shield', permission: 'admins.read' },
       { id: 'health', label: 'System Health', icon: 'cog', permission: 'system.read' },
     ],

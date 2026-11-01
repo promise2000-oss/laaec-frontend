@@ -35,7 +35,11 @@ import type {
   NoticeBoardItem,
   TeacherNotice,
   ResultRecord,
+  SchoolBranding,
+  SchoolGroup,
   SchoolRecord,
+  SchoolStats,
+  SchoolStatus,
   Student,
 } from '../types';
 import type {
@@ -232,6 +236,29 @@ export interface ApiMap {
   GET_SCHOOLS: {
     req: { schoolID?: string };
     res: ApiEnvelope & Success<{ schools: SchoolRecord[] }>;
+  };
+  /**
+   * The school groups (multi-school spec §2) with each group's members derived
+   * from the registry's exclusive `groupId` column — the response carries the
+   * member codes alongside each group so the panel renders a group's schools
+   * without a second join, while the store keeps one source of truth.
+   */
+  GET_SCHOOL_GROUPS: {
+    req: { schoolID?: string };
+    res: ApiEnvelope &
+      Success<{
+        groups: Array<SchoolGroup & { schoolCodes: string[] }>;
+      }>;
+  };
+  /**
+   * School-scoped statistics for one school (spec §1, "view school-specific
+   * statistics"), powering the school-specific dashboard. The mock derives the
+   * counts it can from its fixtures and reports zeros where it has no data for
+   * that school; a real backend would aggregate per tenant.
+   */
+  GET_SCHOOL_STATS: {
+    req: { code: string };
+    res: Partial<Success<{ code: string; stats: SchoolStats }>> & ApiEnvelope;
   };
   GET_EXAM_CONFIG: {
     req: { schoolID: string };
@@ -582,6 +609,93 @@ export interface ApiMap {
       name: string;
       /** Optional address carried on the school's profile row. */
       address?: string;
+      creatorUsername?: string;
+      creatorRole?: AdminRole;
+    };
+    res: ApiEnvelope & Success<{ school?: SchoolRecord }>;
+  };
+  /**
+   * Edit a school's profile and branding (multi-school spec §1 edit, §5). Only
+   * the fields present are applied, so the panel can send a partial patch and
+   * leave `slug`, `status` and `groupId` — owned by their own actions — alone.
+   */
+  UPDATE_SCHOOL: {
+    req: {
+      code: string;
+      name?: string;
+      address?: string;
+      branding?: SchoolBranding;
+      creatorUsername?: string;
+      creatorRole?: AdminRole;
+    };
+    res: ApiEnvelope & Success<{ school?: SchoolRecord }>;
+  };
+  /**
+   * Activate, deactivate, suspend or restore a school (spec §1, §4). The
+   * status is the whole state machine: a SUSPENDED school refuses its
+   * subdomain until it is restored to ACTIVE.
+   */
+  SET_SCHOOL_STATUS: {
+    req: {
+      code: string;
+      status: SchoolStatus;
+      creatorUsername?: string;
+      creatorRole?: AdminRole;
+    };
+    res: ApiEnvelope & Success<{ school?: SchoolRecord }>;
+  };
+  /**
+   * Regenerate a school's subdomain URL (spec §3, "regenerate a URL where
+   * permitted"). Mints a fresh unique slug from the school's name and returns
+   * the full URL, leaving the old slug free.
+   */
+  REGENERATE_SCHOOL_URL: {
+    req: { code: string; creatorUsername?: string; creatorRole?: AdminRole };
+    res: ApiEnvelope & Success<{ school?: SchoolRecord; url?: string }>;
+  };
+  /** Create a school group with a name and optional description (spec §2). */
+  CREATE_SCHOOL_GROUP: {
+    req: {
+      name: string;
+      description?: string;
+      creatorUsername?: string;
+      creatorRole?: AdminRole;
+    };
+    res: ApiEnvelope & Success<{ group?: SchoolGroup }>;
+  };
+  /** Rename a group or change its description (spec §2, edit group information). */
+  UPDATE_SCHOOL_GROUP: {
+    req: {
+      id: string;
+      name?: string;
+      description?: string;
+      creatorUsername?: string;
+      creatorRole?: AdminRole;
+    };
+    res: ApiEnvelope & Success<{ group?: SchoolGroup }>;
+  };
+  /**
+   * Delete a group WITHOUT deleting its schools (spec §2). The handler nulls
+   * `groupId` on every member and leaves the schools themselves untouched;
+   * the response reports how many schools were ungrouped so the panel can
+   * confirm the outcome.
+   */
+  DELETE_SCHOOL_GROUP: {
+    req: { id: string; creatorUsername?: string; creatorRole?: AdminRole };
+    res: ApiEnvelope & Success<{ ungroupedSchools?: number }>;
+  };
+  /**
+   * Set (add, remove or transfer) ONE school's group membership (spec §2 add /
+   * remove / transfer). Because a school's `groupId` is a single exclusive
+   * column, this one action covers all three: passing a group id moves the
+   * school there from wherever it was, passing `null` removes it. Moving a
+   * school is therefore inherently exclusive — it can never end up in two
+   * groups (spec §7).
+   */
+  SET_SCHOOL_GROUP: {
+    req: {
+      code: string;
+      groupId: string | null;
       creatorUsername?: string;
       creatorRole?: AdminRole;
     };
@@ -1604,6 +1718,8 @@ export const GET_ACTIONS = [
   'GET_CONFIG',
   'GET_COGNITO_ADMINS',
   'GET_SCHOOLS',
+  'GET_SCHOOL_GROUPS',
+  'GET_SCHOOL_STATS',
   'GET_EXAM_CONFIG',
   'GET_DEMOTION_LOGS',
   // notifications, calendar and notices (D-64)
@@ -1673,6 +1789,13 @@ export const POST_ACTIONS = [
   'CREATE_ADMIN_ACCESS',
   'DELETE_ADMIN_ACCESS',
   'ADD_SCHOOL',
+  'UPDATE_SCHOOL',
+  'SET_SCHOOL_STATUS',
+  'REGENERATE_SCHOOL_URL',
+  'CREATE_SCHOOL_GROUP',
+  'UPDATE_SCHOOL_GROUP',
+  'DELETE_SCHOOL_GROUP',
+  'SET_SCHOOL_GROUP',
   'UPDATE_ADMIN_STATUS',
   'REQUEST_ADMIN_PASSWORD_RESET',
   'CONFIRM_ADMIN_PASSWORD_RESET',

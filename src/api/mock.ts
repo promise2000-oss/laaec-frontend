@@ -21,7 +21,11 @@ import type {
   Question,
   QuestionStatus,
   QuestionSubmissionRecord,
+  SchoolBranding,
+  SchoolGroup,
   SchoolRecord,
+  SchoolStats,
+  SchoolStatus,
   TeacherNotice,
 } from '../types';
 import { STORAGE_KEYS } from '../types';
@@ -53,6 +57,7 @@ const readSchoolRoles = (): string[] => {
   }
 };
 import { SCHOOL_NAMES, SCHOOL_ORDER } from '../lib/console';
+import { mintSchoolSlug, schoolPortalUrl, slugifySchoolName } from '../lib/tenant';
 import {
   bypassesPermissions,
   hasAdminPlaceholder,
@@ -194,6 +199,16 @@ const MOCK_ADMIN_PASSWORDS: Record<string, string> = {
  */
 const STATE_KEY = 'LAEC_MOCK_LIFECYCLE';
 
+/**
+ * A fixed timestamp for seeded records (the ten built-in schools).
+ *
+ * A constant rather than `Date.now()` so a fresh session and a re-seeded one
+ * produce identical JSON — the seeded schools are static origin data, and a
+ * "created today" stamp that changed every boot would make them look like they
+ * were onboarded whenever the tab was first opened.
+ */
+const SEED_TIMESTAMP = '2026-01-01T00:00:00.000Z';
+
 interface PersistedState {
   submissions: QuestionSubmissionRecord[];
   teacherNotices: TeacherNotice[];
@@ -206,6 +221,13 @@ interface PersistedState {
   notificationCounter: number;
   /** The archdiocesan school registry, seeded from the ten hardcoded schools. */
   schools: SchoolRecord[];
+  /**
+   * The school groups (multi-school spec §2). Membership lives on
+   * `SchoolRecord.groupId`, not here — this is the group records themselves,
+   * and a group's members are derived from the registry so the two can never
+   * disagree.
+   */
+  groups: SchoolGroup[];
 }
 
 const seedState = (): PersistedState => ({
@@ -219,12 +241,25 @@ const seedState = (): PersistedState => ({
   notices: MOCK_NOTICES.map((item) => ({ ...item })),
   notificationCounter: MOCK_NOTIFICATIONS.length,
   /* The school registry (D23 runtime extension) is seeded from the ten schools
-     the origin hardcodes, marked builtin so the panel can protect them. */
-  schools: SCHOOL_ORDER.map((code) => ({
-    Code: code,
-    Name: SCHOOL_NAMES[code],
-    builtin: true,
-  })),
+     the origin hardcodes, marked builtin so the panel can protect them. Each
+     also carries the multi-school fields: a slug minted from its name (so the
+     seeded ten have working portal URLs from the first paint), ACTIVE status,
+     no group and a fixed epoch timestamp. */
+  schools: SCHOOL_ORDER.map((code) => {
+    const name = SCHOOL_NAMES[code];
+    return {
+      Code: code,
+      Name: name,
+      builtin: true,
+      slug: slugifySchoolName(name),
+      status: 'ACTIVE' as SchoolStatus,
+      groupId: null,
+      createdAt: SEED_TIMESTAMP,
+      updatedAt: SEED_TIMESTAMP,
+    };
+  }),
+  /* No groups at boot; a super administrator creates them from the panel. */
+  groups: [],
 });
 
 const loadState = (): PersistedState => {
@@ -237,12 +272,62 @@ const loadState = (): PersistedState => {
     /* An older session (or a corrupt one) may carry no school registry, so fall
        back to the seeded ten rather than rendering an empty dropdown. */
     const schools = Array.isArray(parsed.schools) && parsed.schools.length
-      ? parsed.schools
+      ? migrateSchools(parsed.schools, seeded.schools)
       : seeded.schools;
-    return { ...seeded, ...parsed, schools } as PersistedState;
+    /* Groups were added with the multi-school platform; an older session has
+       none, and an absent or non-array value must seed to `[]` rather than
+       undefined (which would break every group read). */
+    const groups = Array.isArray(parsed.groups) ? parsed.groups : [];
+    /* A school may only point at a group that exists: a group deleted in a
+       later session, or a hand-edited record, must not leave a dangling
+       reference that the group list no longer answers for. */
+    const groupIds = new Set(groups.map((g) => g.id));
+    for (const school of schools) {
+      if (school.groupId !== null && !groupIds.has(school.groupId)) school.groupId = null;
+    }
+    return { ...seeded, ...parsed, schools, groups } as PersistedState;
   } catch {
     return seedState();
   }
+};
+
+/**
+ * Bring a persisted school registry up to the multi-school shape.
+ *
+ * A session saved before the multi-school platform has schools carrying only
+ * `Code`/`Name`/`Address`/`builtin` — no `slug`, `status`, `groupId` or
+ * timestamps, all of which are now required. Rather than discard the
+ * administrator's added schools (the whole point of persistence), each record
+ * is migrated in place: a missing slug is minted from its name, a missing
+ * status becomes ACTIVE, a missing group becomes `null`, and missing timestamps
+ * fall back to the seed epoch. `groupId` is validated against the loaded groups
+ * below so a school cannot point at a group that no longer exists.
+ *
+ * @param loaded - The schools parsed out of sessionStorage.
+ * @param fallback - The seeded schools, used when `loaded` is empty.
+ */
+const migrateSchools = (loaded: SchoolRecord[], fallback: SchoolRecord[]): SchoolRecord[] => {
+  const source = loaded.length ? loaded : fallback;
+  const taken = new Set<string>();
+  return source.map((raw) => {
+    const record: SchoolRecord = {
+      ...raw,
+      slug: raw.slug || slugifySchoolName(raw.Name || raw.Code || ''),
+      status: raw.status || 'ACTIVE',
+      groupId: raw.groupId ?? null,
+      createdAt: raw.createdAt || SEED_TIMESTAMP,
+      updatedAt: raw.updatedAt || SEED_TIMESTAMP,
+    };
+    /* Re-uniquify slugs that collide after migration: an older session could
+       not have had duplicates (there were no slugs), but a corrupt one might. */
+    if (taken.has(record.slug)) {
+      let n = 2;
+      while (taken.has(`${record.slug}-${n}`)) n += 1;
+      record.slug = `${record.slug}-${n}`;
+    }
+    taken.add(record.slug);
+    return record;
+  });
 };
 
 const initialState = loadState();
@@ -262,6 +347,7 @@ const saveState = (): void => {
         notices: initialState.notices,
         notificationCounter: initialState.notificationCounter,
         schools: initialState.schools,
+        groups: initialState.groups,
       } satisfies PersistedState),
     );
   } catch {
@@ -304,6 +390,21 @@ const noticeBoard: NoticeBoardItem[] = initialState.notices;
  * published notice or an added event does.
  */
 const schools: SchoolRecord[] = initialState.schools;
+
+/**
+ * The school groups (multi-school spec §2), a working copy for the same reason
+ * the registry is. Membership itself lives on each school's `groupId` — a
+ * single exclusive column — so this list holds only the group records; the
+ * members of a group are derived from `schools` on every read, which is what
+ * keeps a group and its schools from ever disagreeing.
+ */
+const groups: SchoolGroup[] = initialState.groups;
+
+/** Monotonic group id counter, seeded past any id already in the session. */
+let groupCounter = groups.reduce((max, g) => {
+  const n = Number(/^grp-(\d+)$/.exec(g.id)?.[1] ?? 0);
+  return Number.isFinite(n) && n > max ? n : max;
+}, 0);
 
 let notificationCounter = notifications.length;
 
@@ -463,6 +564,39 @@ const KNOWN_SUBJECTS = new Set<string>([
 type Handler<A extends ActionName> = (
   req: ApiMap[A]['req'],
 ) => ApiMap[A]['res'] | Promise<ApiMap[A]['res']>;
+
+/*
+ * ── per-school statistics (multi-school spec §1) ──────────────────────────
+ *
+ * The mock's fixtures are all scoped to a single school (`MOCK_SCHOOL_ID`),
+ * so these counters honestly return real figures for that school and zeros for
+ * every other. That is deliberate: a multi-school dashboard that fabricated
+ * plausible numbers for schools with no data would be worse than one that
+ * shows the data it actually has. Each helper counts a fixture that carries a
+ * `SchoolID`, matching on the school's code.
+ */
+
+/** Students registered to a school, from the candidate roster. */
+const countStudentsForSchool = (code: string): number =>
+  MOCK_STUDENTS.filter((s) => String(s.SchoolID || '').toUpperCase() === code).length;
+
+/** Examinations: distinct subject papers with results for the school. */
+const countExamsForSchool = (code: string): number =>
+  new Set(
+    MOCK_RESULTS.filter((r) => String(r.SchoolID || '').toUpperCase() === code).map(
+      (r) => String(r.Subject || r.sk || ''),
+    ),
+  ).size;
+
+/** Questions: authored question submissions for the school (each carries a count). */
+const countQuestionsForSchool = (code: string): number =>
+  submissions
+    .filter((sub) => String(sub.SchoolID || '').toUpperCase() === code)
+    .reduce((total, sub) => total + (Number(sub.QuestionCount) || sub.Questions.length || 0), 0);
+
+/** Result records stored for the school. */
+const countResultsForSchool = (code: string): number =>
+  MOCK_RESULTS.filter((r) => String(r.SchoolID || '').toUpperCase() === code).length;
 
 /**
  * Partial because the 49 teacher-portal actions (D-72) are merged in at runtime
@@ -760,6 +894,39 @@ const handlers: Handlers = {
     ...ok('School registry retrieved (mock).'),
     schools: schools.map((s) => ({ ...s })),
   }),
+  /**
+   * The school groups with their members derived from the registry (spec §2).
+   * Each group's `schoolCodes` are the schools whose `groupId` points at it —
+   * computed here rather than stored, so a group and its schools cannot drift
+   * apart, and deleting a group is a single null-out rather than a cascade.
+   */
+  GET_SCHOOL_GROUPS: () => ({
+    ...ok('School groups retrieved (mock).'),
+    groups: groups.map((g) => ({
+      ...g,
+      schoolCodes: schools.filter((s) => s.groupId === g.id).map((s) => s.Code),
+    })),
+  }),
+  /**
+   * School-scoped statistics for one school (spec §1). Derived from the mock's
+   * own fixtures: students and teachers are counted from the roster and staff
+   * directory where they carry this school's code; exams, questions and results
+   * are counted from the fixtures the mock actually holds for that school. A
+   * school with no fixture data reports zeros rather than a fabricated figure.
+   */
+  GET_SCHOOL_STATS: (req) => {
+    const code = String(req.code || '').trim().toUpperCase();
+    const school = schools.find((s) => s.Code === code);
+    if (!school) return { status: 'error', message: `School ${code} not found.` };
+    const stats: SchoolStats = {
+      students: countStudentsForSchool(code),
+      teachers: staffDirectory.filter((a) => a.SchoolID === code).length,
+      exams: countExamsForSchool(code),
+      questions: countQuestionsForSchool(code),
+      results: countResultsForSchool(code),
+    };
+    return { ...ok(`Statistics for ${school.Name} retrieved (mock).`), code, stats };
+  },
   GET_EXAM_CONFIG: () => ({
     ...ok('Exam configuration retrieved (mock).'),
     config: MOCK_CONFIG,
@@ -826,6 +993,11 @@ const handlers: Handlers = {
    * code is normalised to uppercase and must be unique and non-reserved, so a
    * new school cannot shadow an existing SchoolID or the GLOBAL scope every
    * console's cross-school reads depend on.
+   *
+   * Onboarding also mints the school's subdomain URL (multi-school spec §3):
+   * a slug is derived from the name and made unique against every slug already
+   * in the registry, so the school is URL-ready the moment it exists and the
+   * administrator never configures a subdomain by hand.
    */
   ADD_SCHOOL: (req) => {
     const code = String(req.code || '').trim().toUpperCase();
@@ -849,19 +1021,254 @@ const handlers: Handlers = {
     if (schools.some((s) => s.Code === code)) {
       return { status: 'error', message: `School code ${code} already exists.` };
     }
+    /* Spec §3: mint a unique slug from the name. A name that reduces to
+       nothing cannot produce a URL, so onboarding refuses it here rather than
+       persisting a school with no portal address. */
+    const minted = mintSchoolSlug(name, schools.map((s) => s.slug));
+    if (!minted.ok) {
+      return {
+        status: 'error',
+        message:
+          minted.reason === 'EMPTY_NAME'
+            ? 'The school name must contain letters or numbers to generate its URL.'
+            : 'A unique URL could not be generated for this school name.',
+      };
+    }
+    const now = new Date().toISOString();
     const record: SchoolRecord = {
       Code: code,
       Name: name,
       ...(String(req.address || '').trim() ? { Address: String(req.address).trim() } : {}),
       builtin: false,
+      slug: minted.slug,
+      status: 'ACTIVE',
+      groupId: null,
+      createdAt: now,
+      updatedAt: now,
     };
     schools.push(record);
     saveState();
     return {
       ...ok(`School ${code} registered (mock).`),
-      message: `${name} (${code}) added to the archdiocesan registry. It is now selectable across every console.`,
+      message: `${name} (${code}) added to the archdiocesan registry at ${schoolPortalUrl(minted.slug)}. It is now selectable across every console.`,
       school: { ...record },
     };
+  },
+  /**
+   * Edit a school's profile and branding (spec §1 edit, §5). Only the fields
+   * present in the request are applied — a partial patch — so the panel can
+   * change a name without clobbering an address, and `slug`, `status` and
+   * `groupId` (owned by their own actions) are never touched here.
+   */
+  UPDATE_SCHOOL: (req) => {
+    const code = String(req.code || '').trim().toUpperCase();
+    const school = schools.find((s) => s.Code === code);
+    if (!school) return { status: 'error', message: `School ${code} not found.` };
+
+    if (req.name !== undefined) {
+      const name = String(req.name).trim();
+      if (!name) return { status: 'error', message: 'School name cannot be empty.' };
+      school.Name = name;
+    }
+    if (req.address !== undefined) {
+      const address = String(req.address).trim();
+      if (address) school.Address = address;
+      else delete school.Address;
+    }
+    if (req.branding !== undefined) {
+      /* Branding is applied as a shallow merge of the fields present, so the
+         panel can update a colour without erasing the logo set earlier; an
+         explicitly empty value clears that one field. */
+      const incoming = req.branding;
+      const branding: SchoolBranding = { ...(school.branding || {}) };
+      for (const key of Object.keys(incoming) as Array<keyof SchoolBranding>) {
+        const value = incoming[key];
+        if (value === undefined || value === null || String(value).trim() === '') delete branding[key];
+        else branding[key] = String(value).trim();
+      }
+      if (Object.keys(branding).length) school.branding = branding;
+      else delete school.branding;
+    }
+    school.updatedAt = new Date().toISOString();
+    saveState();
+    return {
+      ...ok(`School ${code} updated (mock).`),
+      message: `${school.Name} updated.`,
+      school: { ...school },
+    };
+  },
+  /**
+   * Activate, deactivate, suspend or restore a school (spec §1, §4). The status
+   * is validated against the three-state machine so a typo cannot park a school
+   * in an unknown state that the tenant resolver would then treat as active.
+   */
+  SET_SCHOOL_STATUS: (req) => {
+    const code = String(req.code || '').trim().toUpperCase();
+    const school = schools.find((s) => s.Code === code);
+    if (!school) return { status: 'error', message: `School ${code} not found.` };
+    const status = String(req.status || '').trim().toUpperCase() as SchoolStatus;
+    if (status !== 'ACTIVE' && status !== 'INACTIVE' && status !== 'SUSPENDED') {
+      return { status: 'error', message: `"${req.status}" is not a valid school status.` };
+    }
+    const previous = school.status;
+    school.status = status;
+    school.updatedAt = new Date().toISOString();
+    saveState();
+    return {
+      ...ok(`School ${code} set to ${status} (mock).`),
+      message: `${school.Name} is now ${status}${previous !== status ? ` (was ${previous})` : ''}.`,
+      school: { ...school },
+    };
+  },
+  /**
+   * Regenerate a school's subdomain URL (spec §3). Mints a fresh unique slug
+   * from the school's CURRENT name, so a rename followed by a regeneration
+   * yields a slug that matches; the previous slug is released the moment the
+   * new one is stored, because uniqueness is checked against the registry as it
+   * stands (the school's own old slug is excluded from the `taken` set).
+   */
+  REGENERATE_SCHOOL_URL: (req) => {
+    const code = String(req.code || '').trim().toUpperCase();
+    const school = schools.find((s) => s.Code === code);
+    if (!school) return { status: 'error', message: `School ${code} not found.` };
+    const taken = schools.filter((s) => s !== school).map((s) => s.slug);
+    const minted = mintSchoolSlug(school.Name, taken);
+    if (!minted.ok) {
+      return {
+        status: 'error',
+        message:
+          minted.reason === 'EMPTY_NAME'
+            ? 'The school name must contain letters or numbers to generate a URL.'
+            : 'A unique URL could not be generated for this school name.',
+      };
+    }
+    school.slug = minted.slug;
+    school.updatedAt = new Date().toISOString();
+    saveState();
+    const url = schoolPortalUrl(minted.slug);
+    return {
+      ...ok(`URL regenerated for ${code} (mock).`),
+      message: `${school.Name} now lives at ${url}.`,
+      school: { ...school },
+      url,
+    };
+  },
+  /**
+   * Create a school group (spec §2). The name is required and must be unique
+   * (case-insensitively) so two groups cannot be confused in the picker; the
+   * id is a monotonic `grp-N` minted past anything already in the session.
+   */
+  CREATE_SCHOOL_GROUP: (req) => {
+    const name = String(req.name || '').trim();
+    if (!name) return { status: 'error', message: 'A group name is required.' };
+    if (groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
+      return { status: 'error', message: `A group named "${name}" already exists.` };
+    }
+    groupCounter += 1;
+    const now = new Date().toISOString();
+    const group: SchoolGroup = {
+      id: `grp-${groupCounter}`,
+      name,
+      ...(String(req.description || '').trim() ? { description: String(req.description).trim() } : {}),
+      createdAt: now,
+      updatedAt: now,
+    };
+    groups.push(group);
+    saveState();
+    return {
+      ...ok(`Group "${name}" created (mock).`),
+      message: `Group "${name}" created. Add schools to it from the registry.`,
+      group: { ...group },
+    };
+  },
+  /**
+   * Rename a group or change its description (spec §2). Membership is not
+   * touched — a rename must not disturb which schools belong.
+   */
+  UPDATE_SCHOOL_GROUP: (req) => {
+    const group = groups.find((g) => g.id === String(req.id || ''));
+    if (!group) return { status: 'error', message: 'Group not found.' };
+    if (req.name !== undefined) {
+      const name = String(req.name).trim();
+      if (!name) return { status: 'error', message: 'A group name is required.' };
+      if (groups.some((g) => g !== group && g.name.toLowerCase() === name.toLowerCase())) {
+        return { status: 'error', message: `A group named "${name}" already exists.` };
+      }
+      group.name = name;
+    }
+    if (req.description !== undefined) {
+      const description = String(req.description).trim();
+      if (description) group.description = description;
+      else delete group.description;
+    }
+    group.updatedAt = new Date().toISOString();
+    saveState();
+    return {
+      ...ok(`Group updated (mock).`),
+      message: `Group "${group.name}" updated.`,
+      group: { ...group },
+    };
+  },
+  /**
+   * Delete a group WITHOUT deleting its schools (spec §2). The members'
+   * `groupId` is nulled and the schools are left exactly as they were — the
+   * one property this action exists to guarantee. The count of ungrouped
+   * schools comes back so the panel can confirm it.
+   */
+  DELETE_SCHOOL_GROUP: (req) => {
+    const id = String(req.id || '');
+    const index = groups.findIndex((g) => g.id === id);
+    if (index < 0) return { status: 'error', message: 'Group not found.' };
+    const [removed] = groups.splice(index, 1);
+    let ungroupedSchools = 0;
+    for (const school of schools) {
+      if (school.groupId === id) {
+        school.groupId = null;
+        school.updatedAt = new Date().toISOString();
+        ungroupedSchools += 1;
+      }
+    }
+    saveState();
+    return {
+      ...ok(`Group "${removed.name}" deleted (mock).`),
+      message:
+        ungroupedSchools > 0
+          ? `Group "${removed.name}" deleted. Its ${ungroupedSchools} school${ungroupedSchools === 1 ? '' : 's'} were kept and are now ungrouped.`
+          : `Group "${removed.name}" deleted. No schools were affected.`,
+      ungroupedSchools,
+    };
+  },
+  /**
+   * Set one school's group membership — add, remove or transfer in one action
+   * (spec §2). Because a school's `groupId` is a single exclusive column,
+   * pointing it at a group automatically removes it from whatever group it was
+   * in, which is what makes a transfer atomic and makes two-group membership
+   * impossible by construction (spec §7). Passing `null` removes the school from
+   * its group. The target group must exist, and the school must exist.
+   */
+  SET_SCHOOL_GROUP: (req) => {
+    const code = String(req.code || '').trim().toUpperCase();
+    const school = schools.find((s) => s.Code === code);
+    if (!school) return { status: 'error', message: `School ${code} not found.` };
+
+    const groupId = req.groupId === null || req.groupId === undefined ? null : String(req.groupId);
+    if (groupId !== null && !groups.some((g) => g.id === groupId)) {
+      return { status: 'error', message: 'Group not found.' };
+    }
+    const previous = school.groupId;
+    school.groupId = groupId;
+    school.updatedAt = new Date().toISOString();
+    saveState();
+
+    const target = groupId ? groups.find((g) => g.id === groupId) : undefined;
+    const previousGroup = previous ? groups.find((g) => g.id === previous) : undefined;
+    const message =
+      groupId === null
+        ? `${school.Name} removed from ${previousGroup ? `"${previousGroup.name}"` : 'its group'}.`
+        : previous && previous !== groupId
+          ? `${school.Name} transferred from "${previousGroup?.name ?? 'its group'}" to "${target?.name}".`
+          : `${school.Name} added to "${target?.name}".`;
+    return { ...ok(`Group membership updated (mock).`), message, school: { ...school } };
   },
   SEND_ADMIN_PASSWORD_CHANGED_EMAIL: () => ok('Password change email dispatched (mock).'),
   BULK_UPLOAD_QUESTIONS: (req) => ({

@@ -125,13 +125,19 @@ const usedComponents = new Set(componentMap.values());
  *    `past-questions`, `results`, `student-directory`, `admins`, `health`) are
  *    transcribed origin markup in the view, not registry modules. They have no
  *    registry entry because they are not school-management modules.
+ *  - The multi-school platform's two panels (`schools`, `school-groups`) follow
+ *    the same shape: always-present `<div id="...">` blocks in `AdminView.vue`
+ *    toggled by `activeTab`, so `showTab`'s element guard opens them without
+ *    any `ADMIN_MODULES` entry. They are the archdiocesan registry and its
+ *    grouping surface, which is not a school-management *module* with list
+ *    columns — hence no registry entry.
  *  - `school-dashboard` is a rail entry with no registry module: it is a bespoke
  *    page with no list behind it, which is what a registry entry describes.
  *  - `refund-queue` is a rail entry that navigates rather than opening a panel —
  *    the live app models it as `/store/queue?status=REFUND_PENDING`, so it
  *    carries a `route` rather than an id a panel answers to.
  *
- * Those three are named here rather than tolerated by a heuristic, because a
+ * Those are named here rather than tolerated by a heuristic, because a
  * heuristic would also tolerate a genuine mismatch.
  */
 const LAEC_PANELS = new Set([
@@ -142,6 +148,8 @@ const LAEC_PANELS = new Set([
   'student-directory',
   'admins',
   'health',
+  'schools',
+  'school-groups',
 ]);
 const RAIL_ONLY = new Set(['school-dashboard', 'refund-queue']);
 

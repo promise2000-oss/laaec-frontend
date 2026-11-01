@@ -50,6 +50,7 @@ import AppLoading from '../components/AppLoading.vue';
 import ChartEmptyState from '../components/ChartEmptyState.vue';
 import { canOpenPanel, filterNav, navFor, takePendingPanel } from '../lib/nav';
 import AdminPanelRouter from '../components/admin/AdminPanelRouter.vue';
+import SchoolGroupsPanel from '../components/schools/SchoolGroupsPanel.vue';
 import { ADMIN_MODULE_IDS } from '../types/admin-registry';
 import { useSessionStore } from '../stores/session';
 import { bypassesPermissions, hasPermission } from '../lib/permissions';
@@ -67,9 +68,12 @@ import type {
   LaecUtils,
   Question,
   ResultRecord,
+  SchoolGroup,
   SchoolRecord,
+  SchoolStats,
   Student,
 } from '../types';
+import { schoolPortalUrl } from '../lib/tenant';
 import '../styles/admin-page.css';
 import '../styles/overview-charts.css';
 /* The Saint Finbarr's College admin modules' overrides, scoped to `.ap-admin-panel`.
@@ -1372,6 +1376,284 @@ const addSchool = async (): Promise<void> => {
   loadingVisible.value = false;
 };
 
+/* ── multi-school platform: lifecycle, URLs, groups, stats (spec §1–§3, §5) ── */
+
+/*
+ * The multi-school surface builds on the registry above. `schoolRows` already
+ * drives the College Assignment dropdown, so it stays the single list the
+ * dropdowns read; the additions here are the lifecycle (status), the subdomain
+ * URL, group membership and per-school statistics the spec asks the
+ * administrator to manage from one place.
+ *
+ * `groupRows` mirrors the registry for groups: each carries its members'
+ * codes, derived server-side (in the mock) from `SchoolRecord.groupId`, so the
+ * panel never has to join the two lists by hand.
+ */
+const groupRows = ref<Array<SchoolGroup & { schoolCodes: string[] }>>([]);
+const schoolSearch = ref('');
+const schoolPage = ref(1);
+const SCHOOL_PAGE_SIZE = 8;
+
+/* Edit state for the details drawer. Branding is a flat object so the form can
+   bind each field directly; an empty string clears that field on save. */
+const editingSchool = ref<SchoolRecord | null>(null);
+const editName = ref('');
+const editAddress = ref('');
+const editBranding = ref<Record<string, string>>({});
+
+/* The stats drawer: which school's statistics are open, and the counts. */
+const statsSchool = ref<SchoolRecord | null>(null);
+const statsData = ref<SchoolStats | null>(null);
+const statsLoading = ref(false);
+
+/** Load the school groups so the registry can show each school's group. */
+const loadGroups = async (): Promise<void> => {
+  try {
+    const data = await callApi('GET_SCHOOL_GROUPS', { schoolID: 'ALL' });
+    groupRows.value = data.status === 'success' ? data.groups : [];
+  } catch {
+    /* Groups are decorative on this panel; a failure must not break the table. */
+    groupRows.value = [];
+  }
+};
+
+/** The registry filtered by the search box, then sliced for the current page. */
+const filteredSchools = computed<SchoolRecord[]>(() => {
+  const needle = schoolSearch.value.trim().toLowerCase();
+  if (!needle) return schoolRows.value;
+  return schoolRows.value.filter((s) => {
+    const group = groupRows.value.find((g) => g.id === s.groupId)?.name || '';
+    return (
+      s.Code.toLowerCase().includes(needle) ||
+      s.Name.toLowerCase().includes(needle) ||
+      (s.Address || '').toLowerCase().includes(needle) ||
+      s.slug.toLowerCase().includes(needle) ||
+      group.toLowerCase().includes(needle)
+    );
+  });
+});
+
+const schoolPageCount = computed(() =>
+  Math.max(1, Math.ceil(filteredSchools.value.length / SCHOOL_PAGE_SIZE)),
+);
+
+const pagedSchools = computed<SchoolRecord[]>(() => {
+  const start = (schoolPage.value - 1) * SCHOOL_PAGE_SIZE;
+  return filteredSchools.value.slice(start, start + SCHOOL_PAGE_SIZE);
+});
+
+const gotoSchoolPage = (page: number): void => {
+  schoolPage.value = Math.min(Math.max(1, page), schoolPageCount.value);
+};
+
+/** The full public URL for a school's portal. */
+const schoolUrlOf = (s: SchoolRecord): string => schoolPortalUrl(s.slug);
+
+/** A CSS colour for a lifecycle status, for the status pill. */
+const statusTone = (status: string): string =>
+  status === 'ACTIVE' ? '#14532d' : status === 'SUSPENDED' ? '#8f2a2a' : '#8a6104';
+
+/** A soft background tint matching `statusTone`. */
+const statusBg = (status: string): string =>
+  status === 'ACTIVE' ? '#e6f6ed' : status === 'SUSPENDED' ? '#fbe9e9' : '#fdf3dd';
+
+/* ── edit drawer ──────────────────────────────────────────────────────── */
+
+const startEditSchool = (s: SchoolRecord): void => {
+  editingSchool.value = s;
+  editName.value = s.Name;
+  editAddress.value = s.Address || '';
+  editBranding.value = {
+    logoUrl: s.branding?.logoUrl || '',
+    primaryColor: s.branding?.primaryColor || '',
+    secondaryColor: s.branding?.secondaryColor || '',
+    contactEmail: s.branding?.contactEmail || '',
+    contactPhone: s.branding?.contactPhone || '',
+    address: s.branding?.address || '',
+    examInstructions: s.branding?.examInstructions || '',
+  };
+};
+
+const cancelEditSchool = (): void => {
+  editingSchool.value = null;
+};
+
+const saveSchoolEdit = async (): Promise<void> => {
+  const school = editingSchool.value;
+  if (!school) return;
+  if (!editName.value.trim()) {
+    winAlert('Missing Name', 'A school name is required.');
+    return;
+  }
+  loadingVisible.value = true;
+  try {
+    /* Only the branding fields the administrator actually filled are sent, so
+       clearing one is an explicit empty string and leaving one alone keeps the
+       value already stored. */
+    const branding: Record<string, string> = {};
+    for (const [key, value] of Object.entries(editBranding.value)) {
+      if (value !== undefined && value !== null) branding[key] = value;
+    }
+    const data = await callApi('UPDATE_SCHOOL', {
+      code: school.Code,
+      name: editName.value.trim(),
+      address: editAddress.value.trim(),
+      branding,
+      creatorUsername: localStorage.getItem(STORAGE_KEYS.AdminUsername) || '',
+      creatorRole: (localStorage.getItem(STORAGE_KEYS.AdminRole) || 'SUPER_ADMIN') as AdminRole,
+    });
+    if (data.status !== 'success') throw new Error(data.message || 'School could not be updated.');
+    if (data.school) {
+      schoolRows.value = schoolRows.value.map((s) => (s.Code === data.school!.Code ? data.school! : s));
+    }
+    editingSchool.value = null;
+    winAlert('School Updated', data.message || `${editName.value} updated.`);
+    await loadGroups();
+  } catch (e) {
+    winAlert('Update Failed', msgOf(e) || 'School could not be updated.');
+  }
+  loadingVisible.value = false;
+};
+
+/* ── lifecycle ────────────────────────────────────────────────────────── */
+
+/*
+ * Activate, deactivate or suspend a school. The confirmation names the exact
+ * consequence, because SUSPENDED is the one state that also blocks the school's
+ * own portal and its examination services (spec §4) — an administrator should
+ * never trip it by accident.
+ */
+const requestStatusChange = (s: SchoolRecord, next: 'ACTIVE' | 'SUSPENDED'): void => {
+  const restoring = next === 'ACTIVE';
+  winAlert(
+    restoring ? 'Restore School' : next === 'SUSPENDED' ? 'Suspend School' : 'Deactivate School',
+    restoring
+      ? `Restore ${s.Name}? Its portal and services become reachable again.`
+      : next === 'SUSPENDED'
+        ? `Suspend ${s.Name}? Its portal and protected examination services will be blocked until it is restored.`
+        : `Deactivate ${s.Name}? It stays registered but its portal will not serve.`,
+    'confirm',
+    () => void applyStatus(s, next),
+  );
+};
+
+const applyStatus = async (s: SchoolRecord, status: 'ACTIVE' | 'SUSPENDED'): Promise<void> => {
+  loadingVisible.value = true;
+  try {
+    const data = await callApi('SET_SCHOOL_STATUS', {
+      code: s.Code,
+      status,
+      creatorUsername: localStorage.getItem(STORAGE_KEYS.AdminUsername) || '',
+      creatorRole: (localStorage.getItem(STORAGE_KEYS.AdminRole) || 'SUPER_ADMIN') as AdminRole,
+    });
+    if (data.status !== 'success') throw new Error(data.message || 'Status could not be changed.');
+    if (data.school) {
+      schoolRows.value = schoolRows.value.map((row) => (row.Code === data.school!.Code ? data.school! : row));
+    }
+    winAlert('Status Changed', data.message || `${s.Name} is now ${status}.`);
+  } catch (e) {
+    winAlert('Status Change Failed', msgOf(e) || 'Status could not be changed.');
+  }
+  loadingVisible.value = false;
+};
+
+/* ── URLs ─────────────────────────────────────────────────────────────── */
+
+/*
+ * Regenerate a school's subdomain. The mock returns the new record and URL;
+ * the school's row is swapped in place so the copy/open links update at once.
+ */
+const regenerateUrl = (s: SchoolRecord): void => {
+  winAlert(
+    'Regenerate URL',
+    `Generate a new subdomain for ${s.Name}? The current address (${schoolUrlOf(s)}) will stop being used.`,
+    'confirm',
+    () => void applyRegenerate(s),
+  );
+};
+
+const applyRegenerate = async (s: SchoolRecord): Promise<void> => {
+  loadingVisible.value = true;
+  try {
+    const data = await callApi('REGENERATE_SCHOOL_URL', {
+      code: s.Code,
+      creatorUsername: localStorage.getItem(STORAGE_KEYS.AdminUsername) || '',
+      creatorRole: (localStorage.getItem(STORAGE_KEYS.AdminRole) || 'SUPER_ADMIN') as AdminRole,
+    });
+    if (data.status !== 'success') throw new Error(data.message || 'URL could not be regenerated.');
+    if (data.school) {
+      schoolRows.value = schoolRows.value.map((row) => (row.Code === data.school!.Code ? data.school! : row));
+    }
+    winAlert('URL Regenerated', data.message || `${s.Name} now lives at ${data.url}.`);
+  } catch (e) {
+    winAlert('Regeneration Failed', msgOf(e) || 'URL could not be regenerated.');
+  }
+  loadingVisible.value = false;
+};
+
+/* Copy and open are client-side only; they need no transport. */
+const copySchoolUrl = async (s: SchoolRecord): Promise<void> => {
+  const url = schoolUrlOf(s);
+  try {
+    await navigator.clipboard.writeText(url);
+    winAlert('Copied', `${url} copied to the clipboard.`);
+  } catch {
+    winAlert('Copy Failed', `Could not copy automatically. The URL is: ${url}`);
+  }
+};
+
+/* ── group membership (spec §2) ───────────────────────────────────────── */
+
+/*
+ * Set a school's group from the row's dropdown. Passing the group id adds or
+ * transfers the school; passing an empty string removes it — because a school's
+ * `groupId` is a single exclusive column, moving it can never leave it in two
+ * groups (spec §7).
+ */
+const setSchoolGroup = async (s: SchoolRecord, groupId: string): Promise<void> => {
+  loadingVisible.value = true;
+  try {
+    const data = await callApi('SET_SCHOOL_GROUP', {
+      code: s.Code,
+      groupId: groupId || null,
+      creatorUsername: localStorage.getItem(STORAGE_KEYS.AdminUsername) || '',
+      creatorRole: (localStorage.getItem(STORAGE_KEYS.AdminRole) || 'SUPER_ADMIN') as AdminRole,
+    });
+    if (data.status !== 'success') throw new Error(data.message || 'Group could not be changed.');
+    if (data.school) {
+      schoolRows.value = schoolRows.value.map((row) => (row.Code === data.school!.Code ? data.school! : row));
+    }
+    await loadGroups();
+  } catch (e) {
+    winAlert('Group Change Failed', msgOf(e) || 'Group could not be changed.');
+    /* Reload so the dropdown snaps back to the true membership after a failure. */
+    await loadGroups();
+  }
+  loadingVisible.value = false;
+};
+
+/* ── statistics (spec §1) ─────────────────────────────────────────────── */
+
+const openSchoolStats = async (s: SchoolRecord): Promise<void> => {
+  statsSchool.value = s;
+  statsData.value = null;
+  statsLoading.value = true;
+  try {
+    const data = await callApi('GET_SCHOOL_STATS', { code: s.Code });
+    statsData.value = data.status === 'success' && data.stats ? data.stats : null;
+    if (data.status !== 'success') throw new Error(data.message || 'Statistics unavailable.');
+  } catch (e) {
+    winAlert('Statistics Failed', msgOf(e) || 'School statistics could not be loaded.');
+    statsSchool.value = null;
+  }
+  statsLoading.value = false;
+};
+
+const closeSchoolStats = (): void => {
+  statsSchool.value = null;
+  statsData.value = null;
+};
+
 /* ── results (origin lines 1742–1835, 1882–1959, 2595–2604, 2783–2836) ── */
 
 const getResultClassValue = (result: ResultRecord): string =>
@@ -2302,6 +2584,7 @@ onMounted(async () => {
   void loadGlobalStats();
   void loadAdministratorDirectory();
   void loadSchools();
+  void loadGroups();
   checkHealth();
   setInterval(checkHealth, 10000);
 
@@ -2899,16 +3182,19 @@ onMounted(async () => {
     </div>
 
     <!-- ── SCHOOLS ──────────────────────────────────────────────────── -->
-    <!-- The archdiocesan school registry (D23 runtime extension). The origin
-         hardcodes ten schools with no way to add one; this panel is that way,
-         and it is super-administrator-only via `schools.manage`. -->
+    <!-- The archdiocesan school registry (D23 runtime extension), extended
+         into the multi-school platform's Schools Management surface (spec §1).
+         The origin hardcodes ten schools with no way to add one; this panel
+         registers, edits, activates/suspends and hands out each school's
+         subdomain URL, and is super-administrator-only via the `schools.*`
+         codes. -->
     <div id="schools" class="tab-panel" :class="{ active: activeTab === 'schools' }">
       <div class="card">
-        <h3>Archdiocesan Schools</h3>
+        <h3>Register a School</h3>
         <p style="font-size: 0.75rem; color: #666; margin-bottom: 1.5rem">
-          Register a new archdiocesan school. A new school becomes selectable across every console — in the
-          College Assignment dropdown, the directory filters and the joint-exam reports — as soon as it is
-          added.
+          Register a new archdiocesan school. Its subdomain URL is generated automatically from the name. A new
+          school becomes selectable across every console — in the College Assignment dropdown, the directory
+          filters and the joint-exam reports — as soon as it is added.
         </p>
         <div class="grid-2">
           <div>
@@ -2930,22 +3216,153 @@ onMounted(async () => {
         </div>
         <button class="btn-primary" style="margin-top: 20px" @click="addSchool()">ADD SCHOOL</button>
       </div>
-      <div class="table-responsive">
-        <table>
-          <thead><tr><th>Code</th><th>School Name</th><th>Address</th><th>Type</th></tr></thead>
-          <tbody id="school-table-body">
-            <tr v-for="s in schoolRows" :key="s.Code">
-              <td style="font-weight: bold; color: var(--laec-blue)">{{ s.Code }}</td>
-              <td>{{ s.Name }}</td>
-              <td>{{ s.Address || '—' }}</td>
-              <td><span style="font-size: 0.7rem; font-weight: bold">{{ s.builtin ? 'BUILT-IN' : 'ADDED' }}</span></td>
-            </tr>
-            <tr v-if="!schoolRows.length">
-              <td colspan="4" style="text-align: center; color: #999">No schools loaded.</td>
-            </tr>
-          </tbody>
-        </table>
+
+      <!-- ── edit drawer (spec §1 edit, §5 branding) ─────────────────── -->
+      <div class="card" v-if="editingSchool">
+        <h3>Edit {{ editingSchool.Name }}</h3>
+        <p style="font-size: 0.72rem; color: #666; margin-bottom: 1.25rem">
+          Update the school's profile and the branding shown on its own portal. Leave a branding field empty to
+          clear it; the URL, status and group are managed from the table below.
+        </p>
+        <div class="grid-2">
+          <div>
+            <label>School Name</label>
+            <input type="text" v-model="editName" />
+          </div>
+          <div>
+            <label>Address</label>
+            <input type="text" v-model="editAddress" placeholder="e.g. Akoka, Yaba, Lagos" />
+          </div>
+        </div>
+        <h4 style="margin: 1.5rem 0 0.75rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666">
+          Portal Branding
+        </h4>
+        <div class="grid-2">
+          <div>
+            <label>Logo URL</label>
+            <input type="text" v-model="editBranding.logoUrl" placeholder="/logo.png" />
+          </div>
+          <div>
+            <label>Primary Colour</label>
+            <input type="text" v-model="editBranding.primaryColor" placeholder="#123456" />
+          </div>
+          <div>
+            <label>Secondary Colour</label>
+            <input type="text" v-model="editBranding.secondaryColor" placeholder="#654321" />
+          </div>
+          <div>
+            <label>Contact Email</label>
+            <input type="text" v-model="editBranding.contactEmail" placeholder="office@school.edu" />
+          </div>
+          <div>
+            <label>Contact Phone</label>
+            <input type="text" v-model="editBranding.contactPhone" placeholder="+234…" />
+          </div>
+          <div>
+            <label>Branding Address</label>
+            <input type="text" v-model="editBranding.address" placeholder="Shown in the portal footer" />
+          </div>
+          <div style="grid-column: 1 / -1">
+            <label>Examination Instructions</label>
+            <textarea v-model="editBranding.examInstructions" rows="3" placeholder="Shown to candidates before a paper starts"></textarea>
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px">
+          <button class="btn-primary" @click="saveSchoolEdit()">SAVE CHANGES</button>
+          <button class="btn-secondary" style="background: #eee; color: #333; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer" @click="cancelEditSchool()">CANCEL</button>
+        </div>
       </div>
+
+      <!-- ── statistics drawer (spec §1 school-specific statistics) ──── -->
+      <div class="card" v-if="statsSchool">
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <h3>{{ statsSchool.Name }} — Statistics</h3>
+          <button style="background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #666" @click="closeSchoolStats()">×</button>
+        </div>
+        <p style="font-size: 0.72rem; color: #666; margin: 0.5rem 0 1.25rem">
+          School-scoped figures for {{ statsSchool.Code }}. These are derived from the platform's own records for
+          this school; a school with no data yet reports zeros rather than a guess.
+        </p>
+        <div v-if="statsLoading" style="color: #777; font-size: 0.8rem">Loading statistics…</div>
+        <div v-else-if="statsData" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px">
+          <div v-for="item in [
+            { label: 'Students', value: statsData.students },
+            { label: 'Teachers', value: statsData.teachers },
+            { label: 'Exams', value: statsData.exams },
+            { label: 'Questions', value: statsData.questions },
+            { label: 'Results', value: statsData.results },
+          ]" :key="item.label" style="border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; text-align: center">
+            <div style="font-size: 1.5rem; font-weight: bold; color: var(--laec-blue)">{{ item.value }}</div>
+            <div style="font-size: 0.7rem; color: #777; text-transform: uppercase; letter-spacing: 0.05em">{{ item.label }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── registry table ──────────────────────────────────────────── -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem">
+          <h3 style="margin: 0">Registered Schools</h3>
+          <input type="text" v-model="schoolSearch" @input="gotoSchoolPage(1)" placeholder="Search by code, name, address, URL or group…" style="max-width: 320px; width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.8rem" />
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th><th>School Name</th><th>Status</th><th>Subdomain URL</th><th>Group</th><th>Type</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="school-table-body">
+              <tr v-for="s in pagedSchools" :key="s.Code">
+                <td style="font-weight: bold; color: var(--laec-blue)">{{ s.Code }}</td>
+                <td>{{ s.Name }}</td>
+                <td>
+                  <span :style="{ fontSize: '0.68rem', fontWeight: 'bold', color: statusTone(s.status), background: statusBg(s.status), padding: '3px 8px', borderRadius: '10px' }">{{ s.status }}</span>
+                </td>
+                <td style="font-size: 0.72rem">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+                    <code style="color: #444">{{ schoolUrlOf(s) }}</code>
+                    <button title="Copy URL" style="background: none; border: none; cursor: pointer; color: var(--laec-blue); font-size: 0.9rem" @click="copySchoolUrl(s)">⧉</button>
+                    <a :href="schoolUrlOf(s)" target="_blank" rel="noopener" title="Open portal" style="color: var(--laec-blue); text-decoration: none">↗</a>
+                    <button title="Regenerate URL" style="background: none; border: none; cursor: pointer; color: #8a6104; font-size: 0.9rem" @click="regenerateUrl(s)">↻</button>
+                  </div>
+                </td>
+                <td>
+                  <select :value="s.groupId || ''" @change="setSchoolGroup(s, ($event.target as HTMLSelectElement).value)" style="font-size: 0.72rem; padding: 4px 6px; border: 1px solid #ddd; border-radius: 5px; max-width: 140px">
+                    <option value="">— None —</option>
+                    <option v-for="g in groupRows" :key="g.id" :value="g.id">{{ g.name }}</option>
+                  </select>
+                </td>
+                <td><span style="font-size: 0.7rem; font-weight: bold">{{ s.builtin ? 'BUILT-IN' : 'ADDED' }}</span></td>
+                <td style="font-size: 0.72rem; white-space: nowrap">
+                  <button style="background: none; border: none; cursor: pointer; color: var(--laec-blue); font-size: 0.72rem; margin-right: 8px" @click="openSchoolStats(s)">Stats</button>
+                  <button style="background: none; border: none; cursor: pointer; color: var(--laec-blue); font-size: 0.72rem; margin-right: 8px" @click="startEditSchool(s)">Edit</button>
+                  <button v-if="s.status !== 'ACTIVE'" style="background: none; border: none; cursor: pointer; color: #14532d; font-size: 0.72rem; font-weight: bold" @click="requestStatusChange(s, 'ACTIVE')">Restore</button>
+                  <button v-else style="background: none; border: none; cursor: pointer; color: #8f2a2a; font-size: 0.72rem; font-weight: bold" @click="requestStatusChange(s, 'SUSPENDED')">Suspend</button>
+                </td>
+              </tr>
+              <tr v-if="!pagedSchools.length">
+                <td colspan="7" style="text-align: center; color: #999">{{ schoolSearch ? 'No schools match your search.' : 'No schools loaded.' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination (spec §9). Hidden when a single page suffices. -->
+        <div v-if="schoolPageCount > 1" style="display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 1rem">
+          <button :disabled="schoolPage <= 1" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; background: #fff" @click="gotoSchoolPage(schoolPage - 1)">Prev</button>
+          <span style="font-size: 0.78rem; color: #666">Page {{ schoolPage }} of {{ schoolPageCount }}</span>
+          <button :disabled="schoolPage >= schoolPageCount" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; background: #fff" @click="gotoSchoolPage(schoolPage + 1)">Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SCHOOL GROUPS ─────────────────────────────────────────────── -->
+    <!-- The multi-school platform's grouping surface (spec §2). Mounted as a
+         standalone component inside this always-present div, which is what
+         lets `showTab`'s element guard open the panel; the component owns the
+         group CRUD and membership and reports back through its own banner.
+         `v-if` defers its data load until the panel is actually opened. -->
+    <div id="school-groups" class="tab-panel" :class="{ active: activeTab === 'school-groups' }">
+      <SchoolGroupsPanel v-if="activeTab === 'school-groups'" />
     </div>
 
     <!-- ── ADMINS ───────────────────────────────────────────────────── -->

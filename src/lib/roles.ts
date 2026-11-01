@@ -248,6 +248,18 @@ const SUPER_ADMIN_PORTAL_DEFAULTS = [
      Saint Finbarr's portal grant with its one owning console. */
   'schools.read',
   'schools.manage',
+  /* Multi-school platform (multi-school spec §1, §2, §3, §5). Editing a school
+     profile, changing its lifecycle state, minting its subdomain URL and
+     managing groups are all master-level acts on the same registry, so they
+     inherit the registry's one-console rule and are granted here only. The
+     GROUP_ADMIN role the spec envisages would take a subset of
+     `school_groups.*` once a backend identity model exists (see the deployment
+     requirements doc); today the super administrator owns all of them. */
+  'schools.update',
+  'schools.status',
+  'schools.urls',
+  'school_groups.read',
+  'school_groups.manage',
   /* User & roles */
   'users.read',
   'users.create',

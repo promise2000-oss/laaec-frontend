@@ -48,6 +48,12 @@ const ICONS: Record<string, string> = {
      `users`, which already means "Student Directory" here. Same 24-box, 1.7
      stroke and 18px scale as every other icon in this map. */
   building: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20.5V6a1.5 1.5 0 0 1 1.5-1.5h7A1.5 1.5 0 0 1 14 6v14.5"/><path d="M14 10h4.5A1.5 1.5 0 0 1 20 11.5v9"/><path d="M2.5 20.5h19"/><path d="M7 8h4M7 11.5h4M7 15h4M16.5 13.5h1M16.5 17h1"/></svg>',
+  /* `layers` was added with the multi-school platform's School Groups (spec
+     §2): a glyph for a COLLECTION of schools, distinct from `building`, which
+     already means the single-school registry. Three stacked sheets read as
+     "a group of these". Same 24-box, 1.7 stroke and 18px scale as every other
+     icon in this map. */
+  layers: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8Z"/><path d="m4 12.5 8 4.2 8-4.2"/><path d="m4 16.5 8 4.2 8-4.2"/></svg>',
   cog: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.5 7.5l2 1.2M17.5 15.3l2 1.2M4.5 16.5l2-1.2M17.5 8.7l2-1.2"/></svg>',
   check: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg>',
   inbox: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 13 6 5.5h12L20.5 13v5a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18Z"/><path d="M3.5 13H9a3 3 0 0 0 6 0h5.5"/></svg>',

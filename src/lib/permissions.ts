@@ -51,6 +51,17 @@ export const PERMISSION_CODES = [
      which only a super administrator performs. */
   'schools.read',
   'schools.manage',
+  /* Multi-school platform (multi-school spec §1, §2, §3). The registry codes
+     above cover reading the list and onboarding a school; these four split the
+     remaining master-level acts by what they touch, so the audit trail and the
+     rail can distinguish editing a profile from changing lifecycle state from
+     minting a URL from grouping schools. All four are super-administrator-only,
+     like the registry itself. */
+  'schools.update',
+  'schools.status',
+  'schools.urls',
+  'school_groups.read',
+  'school_groups.manage',
 
   /* St Finbarr's teacher portal (teacher-portal addendum, D-72). The codes are
      the origin's own `module.action` strings, so a code named here can be
@@ -330,6 +341,18 @@ export const ACTION_PERMISSIONS: Record<string, string | null> = {
      master-level act — it widens the registry every console's dropdowns read —
      so it is gated on its own code rather than folded into admins.manage. */
   ADD_SCHOOL: 'schools.manage',
+
+  /* Multi-school platform (multi-school spec §1, §2, §3). Each write is gated
+     on the code that names the act it performs, so the transport refuses a
+     status change under an edit grant and a group mutation under a URL grant —
+     the same fail-closed rule every other action follows (D-71). */
+  UPDATE_SCHOOL: 'schools.update',
+  SET_SCHOOL_STATUS: 'schools.status',
+  REGENERATE_SCHOOL_URL: 'schools.urls',
+  CREATE_SCHOOL_GROUP: 'school_groups.manage',
+  UPDATE_SCHOOL_GROUP: 'school_groups.manage',
+  DELETE_SCHOOL_GROUP: 'school_groups.manage',
+  SET_SCHOOL_GROUP: 'school_groups.manage',
 
   /* portal and examination configuration */
   UPDATE_MODE: 'exam.settings.manage',
